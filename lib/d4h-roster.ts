@@ -16,8 +16,8 @@ import KV from '../../../src/base/kv.ts';
 import { liveQuery, type Observable } from 'dexie';
 import { db } from '../../../src/database.ts';
 
-import { fetchMembers, fetchEquipment, fetchQualifications } from './d4h-client.ts';
-import { normalizeMember, normalizeEquipment, normalizeQualification } from './d4h-normalize.ts';
+import { fetchMembers, fetchEquipment, fetchEquipmentCategories, fetchQualifications } from './d4h-client.ts';
+import { normalizeMember, normalizeEquipment, normalizeEquipmentCategory, normalizeQualification } from './d4h-normalize.ts';
 import { categoryIsWanted, WANTED_CATEGORY_KEYWORDS } from './d4h-equipment-categories.ts';
 import type { D4HConfig } from './d4h-config.ts';
 import type {
@@ -99,9 +99,29 @@ export async function syncNow(config: D4HConfig): Promise<SyncResult> {
     if (equipResp.warning) warnings.push(equipResp.warning);
 
     const allEquipment: D4HEquipment[] = [];
+    let droppedEquipment = 0;
     for (const raw of equipResp.records) {
         const e = normalizeEquipment(raw);
         if (e) allEquipment.push(e);
+        else droppedEquipment++;
+    }
+    if (droppedEquipment > 0) {
+        warnings.push(`Dropped ${droppedEquipment} equipment record(s) missing id during normalize.`);
+    }
+
+    // Resolve category id → title (equipment records carry only the category id).
+    const catResp = await fetchEquipmentCategories(config);
+    if (catResp.warning) warnings.push(catResp.warning);
+    const categoryTitleById = new Map<number, string>();
+    for (const raw of catResp.records) {
+        const c = normalizeEquipmentCategory(raw);
+        if (c) categoryTitleById.set(c.id, c.title);
+    }
+    for (const e of allEquipment) {
+        if (e.category) continue;                 // already had an inline title
+        if (e.categoryId != null) {
+            e.category = categoryTitleById.get(e.categoryId) ?? `Category ${e.categoryId}`;
+        }
     }
 
     // Discovery: distinct categories with counts, flagged by whether the filter keeps them.

@@ -73,16 +73,47 @@ export function normalizeMember(raw: Json): D4HMember | null {
 }
 
 export function normalizeEquipment(raw: Json): D4HEquipment | null {
+    // Only `id` is required. D4H equipment records (verified Phase 4) carry NO top-level
+    // name — the human label is the equipment *kind* title (e.g. "NIGHT VISION MONOCULAR").
     const id = num(raw.id);
-    const name = str(raw.name);
-    if (id === undefined || !name) return null;
+    if (id === undefined) return null;
+
+    const name =
+        nestedString(raw.kind,  'title') ??
+        nestedString(raw.model, 'title') ??
+        str(raw.name) ??
+        str(raw.title) ??
+        str(raw.ref) ??
+        `Equipment ${id}`;
+
+    // Category is referenced by id only ({ resourceType, id }); the title lives in the
+    // separate EquipmentCategory list and is resolved in syncNow. Read the id from the
+    // record's own category, falling back to the kind's category.
+    const categoryId =
+        num((raw.category as Json | undefined)?.id) ??
+        num(((raw.kind as Json | undefined)?.category as Json | undefined)?.id);
+
+    // Keep an inline title if some other endpoint shape ever provides one.
+    const category =
+        nestedString(raw.category, 'title') ??
+        nestedString(raw.category, 'name');
+
     return {
         id,
-        ref:      str(raw.ref),
+        ref:        str(raw.ref),
         name,
-        category: str((raw.category as Json | undefined)?.title) ?? str(raw.category),
-        status:   str(raw.status),
+        categoryId,
+        category,
+        status:     str(raw.status) ?? nestedString(raw.status, 'name'),
     };
+}
+
+/** EquipmentCategory record → { id, title } for the id→title lookup. */
+export function normalizeEquipmentCategory(raw: Json): { id: number; title: string } | null {
+    const id = num(raw.id);
+    const title = str(raw.title) ?? str(raw.name);
+    if (id === undefined || !title) return null;
+    return { id, title };
 }
 
 export function normalizeQualification(raw: Json): D4HQualification | null {

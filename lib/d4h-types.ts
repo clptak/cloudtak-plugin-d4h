@@ -39,11 +39,12 @@ export interface D4HMember {
 }
 
 export interface D4HEquipment {
-    id:        number;
-    ref?:      string;
-    name:      string;
-    category?: string;
-    status?:   string;
+    id:         number;
+    ref?:       string;
+    name:       string;
+    categoryId?: number;             // D4H EquipmentCategory id (records reference category by id only)
+    category?:  string;              // resolved category title (looked up from the category list)
+    status?:    string;
     groups?:   string[];              // server-set (plan §4A); client cache may omit
 }
 

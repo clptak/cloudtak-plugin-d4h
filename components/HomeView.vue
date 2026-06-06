@@ -112,10 +112,10 @@
             </div>
 
             <!-- Equipment preview (vehicles / UAS / tech litter only) -->
-            <div v-if='roster && (roster.equipment.length || meta?.equipmentCategories?.length)' class='card mb-3'>
+            <div v-if='roster?.equipment?.length || meta?.equipmentCategories?.length' class='card mb-3'>
                 <div class='card-header py-1 px-2 d-flex align-items-center gap-2 flex-wrap'>
                     <span class='small fw-semibold'>
-                        Equipment ({{ filteredEquipment.length }}<span v-if='filteredEquipment.length !== roster.equipment.length' class='text-muted fw-normal'> of {{ roster.equipment.length }}</span>)
+                        Equipment ({{ filteredEquipment.length }}<span v-if='filteredEquipment.length !== (roster?.equipment?.length ?? 0)' class='text-muted fw-normal'> of {{ roster?.equipment?.length ?? 0 }}</span>)
                     </span>
                     <input
                         v-model='equipFilter'
@@ -273,7 +273,7 @@ function toggleSort(key: 'badge' | 'name'): void {
 }
 
 const filteredEquipment = computed(() => {
-    if (!roster.value) return [];
+    if (!roster.value?.equipment) return [];
     const q = equipFilter.value.trim().toLowerCase();
     return roster.value.equipment.filter(e => {
         if (!q) return true;

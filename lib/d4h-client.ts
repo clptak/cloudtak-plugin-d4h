@@ -329,6 +329,36 @@ export interface BestEffortResult {
     warning?:       string;
 }
 
+/**
+ * Equipment categories — id → title lookup. Equipment records reference their category
+ * by id only (no title inline), so we fetch the category list separately. Best-effort:
+ * tries the known path shapes and falls back to a warning so equipment still syncs.
+ */
+export async function fetchEquipmentCategories(config: D4HConfig): Promise<BestEffortResult> {
+    const candidates = [
+        `${ctxPath(config)}/equipment-categories`,
+        `${ctxPath(config)}/equipment/categories`,
+        `${ctxPath(config)}/equipment-category`,
+    ];
+    const errors: string[] = [];
+    for (const path of candidates) {
+        try {
+            const r = await fetchAllPages(config, path);
+            return { records: r.records, pages: r.pages, reportedTotal: r.reportedTotal };
+        } catch (e) {
+            const err = e as Error & { status?: number };
+            errors.push(`${path}: ${err.message}`);
+            if (err.status !== 404) break;
+        }
+    }
+    return {
+        records:       [],
+        pages:         0,
+        reportedTotal: null,
+        warning:       `Equipment categories fetch failed — equipment will show category ids, not names. Tried: ${errors.join(' | ')}`,
+    };
+}
+
 /** Equipment — best-effort: a non-200 becomes a warning, members still sync. */
 export async function fetchEquipment(config: D4HConfig): Promise<BestEffortResult> {
     try {
