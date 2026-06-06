@@ -33,11 +33,15 @@ per-browser** — not synced across devices or users, and not access-controlled.
 - **Members** (now operational-only): `id`, `ref` (the D4H reference that equals the last
   3 digits of the TAK callsign), `name`, `position`, `status`, `email`, `mobile`, `phone`,
   optional `qualifications[]`, and a reserved `groups[]` field that is currently unpopulated.
-- **Equipment**: `id`, `ref`, `name`, `category`, `status`.
-- **Qualifications**: joined onto members by `memberId` — but currently returning **0**,
-  because the qualifications endpoint path is still unconfirmed (`docs/PLAN.md` §8.3 `[verify]`).
-- **meta**: `fetchedAt`, `region`, `context`, `contextId`, `memberCount`, `equipmentCount`,
-  and a `warnings[]` array.
+- **Equipment** (filtered to vehicles / UAS / tech litter): `id`, `ref`, `name`, `categoryId`,
+  `category`, `status`. D4H equipment records carry no top-level name — `name` is taken from
+  the equipment **kind** title (e.g. "NIGHT VISION MONOCULAR"). The record references its
+  category by **id only**, so `category` (the title) is resolved from the separate
+  EquipmentCategory list during sync.
+- **Qualifications**: joined onto members by `memberId` — **working** (last sync resolved 56).
+- **meta**: `fetchedAt`, `region`, `context`, `contextId`, `memberCount`, `equipmentCount`
+  (post-filter), `equipmentCategories[]` (every category title found, with counts and whether
+  the filter kept it), and a `warnings[]` array.
 
 ## How other plugins access it
 
@@ -65,8 +69,8 @@ reserved hook for that filtering — which is why it exists but is empty today.
 | Area | State |
 |------|-------|
 | Members | Working. Operational-only filter and the pagination off-by-one both fixed. |
-| Equipment | Working. Filtered to vehicles / UAS / tech litter, with a sortable table in the view. Exact category labels are discovered on each sync and reported (see below). |
-| Qualifications | Returning 0 — pending the correct endpoint path (`docs/PLAN.md` §8.3). |
+| Equipment | Working. Filtered to vehicles / UAS / tech litter, with a sortable table in the view. Names come from the equipment kind title; category names are resolved from the EquipmentCategory list. Categories are discovered and reported each sync. |
+| Qualifications | Working. Joined onto members by `memberId` (last sync resolved 56). |
 | Cross-plugin sharing | Raw `db.kv` cache only; no access control yet. |
 | Server route / TAK-group access control | Not built (planned Phase 3.5). |
 
@@ -87,3 +91,13 @@ reserved hook for that filtering — which is why it exists but is empty today.
   if a wanted keyword matched nothing. Filtering is currently client-side and authoritative;
   a server-side `?category=` request filter can be layered on once the discovered category
   ids/labels are confirmed.
+- **Equipment schema (verified against the live API):** D4H equipment records have no
+  top-level `name` (the earlier normalizer silently dropped all 385 records for this reason)
+  and reference their category by **id only** (`category: { id }`, no title). Fixed by:
+  taking the display name from `kind.title`, fetching the EquipmentCategory list
+  (`fetchEquipmentCategories`, with fallback path candidates) to build an id→title map, and
+  resolving each item's `categoryId` to its title before filtering. Confirmed live: VEHICLES
+  (1271), UAS (9046), Tech Litter (2966) all match the keyword filter without colliding with
+  the other "Tech …" categories.
+- **Qualifications:** now resolving (56 in the last sync) via the member-qualifications
+  endpoint, joined onto members by `memberId`.
