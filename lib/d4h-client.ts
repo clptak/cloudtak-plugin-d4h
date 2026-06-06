@@ -434,11 +434,10 @@ export async function fetchEquipment(config: D4HConfig): Promise<BestEffortResul
  * Qualifications — best-effort with one fallback. Tries the modern member-qualifications
  * path first; if it 404s, retries the older qualification-awards shape.
  */
-export async function fetchQualifications(config: D4HConfig): Promise<BestEffortResult> {
-    const candidates = [
-        `${ctxPath(config)}/member-qualifications`,
-        `${ctxPath(config)}/qualification-awards`,
-    ];
+/** Try each candidate path in order; first one that returns wins, else a warning. */
+async function fetchFromCandidates(
+    config: D4HConfig, candidates: string[], label: string,
+): Promise<BestEffortResult> {
     const errors: string[] = [];
     for (const path of candidates) {
         try {
@@ -450,10 +449,21 @@ export async function fetchQualifications(config: D4HConfig): Promise<BestEffort
             if (err.status !== 404) break;
         }
     }
-    return {
-        records:       [],
-        pages:         0,
-        reportedTotal: null,
-        warning:       `Qualifications fetch failed — see plan §8.3. Tried: ${errors.join(' | ')}`,
-    };
+    return { records: [], pages: 0, reportedTotal: null, warning: `${label} fetch failed. Tried: ${errors.join(' | ')}` };
+}
+
+/** Qualification CATALOG — the definitions (id → title). No member links. */
+export async function fetchQualificationCatalog(config: D4HConfig): Promise<BestEffortResult> {
+    return fetchFromCandidates(config, [
+        `${ctxPath(config)}/member-qualifications`,
+        `${ctxPath(config)}/qualifications`,
+    ], 'Qualification catalog');
+}
+
+/** Qualification AWARDS — the member→qualification links (with start/end dates). */
+export async function fetchQualificationAwards(config: D4HConfig): Promise<BestEffortResult> {
+    return fetchFromCandidates(config, [
+        `${ctxPath(config)}/member-qualification-awards`,
+        `${ctxPath(config)}/qualification-awards`,
+    ], 'Qualification awards');
 }

@@ -19,7 +19,7 @@
 // We accept extra fields silently (D4H adds them; we don't care). We only fail loudly
 // if id/name are missing, because those are the keys that make a member useful at all.
 
-import type { D4HMember, D4HEquipment, D4HQualification, D4HStatus } from './d4h-types.ts';
+import type { D4HMember, D4HEquipment, D4HStatus } from './d4h-types.ts';
 
 type Json = Record<string, unknown>;
 
@@ -166,24 +166,33 @@ export function normalizeEquipmentModel(raw: Json): { id: number; title: string;
     return { id, title, brandId };
 }
 
-export function normalizeQualification(raw: Json): D4HQualification | null {
-    // D4H qualification-award shapes vary by endpoint; cover the common ones.
-    // - { id, qualification: { id, name }, expiresAt, memberId }
-    // - { id, name, expiresAt, member: { id } }
+/** Qualification catalog entry (MemberQualification) → { id, title }. */
+export function normalizeQualificationDef(raw: Json): { id: number; title: string } | null {
     const id = num(raw.id);
-    if (id === undefined) return null;
+    const title = str(raw.title) ?? str(raw.name);
+    if (id === undefined || !title) return null;
+    return { id, title };
+}
 
-    const qualName =
-        str(raw.name) ??
-        nestedString(raw.qualification, 'name') ??
-        nestedString(raw.qualification, 'title');
-    if (!qualName) return null;
-
-    const expiresAt = str(raw.expiresAt) ?? str(raw.expires_at) ?? str(raw.expiry);
-
+/**
+ * Qualification AWARD (MemberQualificationAward) → the member→qualification link.
+ * Title is NOT on the award (only `qualification.id`); it's resolved from the catalog
+ * in syncNow. Expiry is D4H's `endsAt`.
+ */
+export function normalizeQualificationAward(
+    raw: Json,
+): { id: number; memberId: number; qualId?: number; expiresAt?: string } | null {
+    const id = num(raw.id);
     const memberId =
-        num(raw.memberId) ??
-        num((raw.member as Json | undefined)?.id);
+        num((raw.member as Json | undefined)?.id) ??
+        num(raw.memberId);
+    if (id === undefined || memberId === undefined) return null;
 
-    return { id, name: qualName, expiresAt, memberId };
+    const qualId =
+        num((raw.qualification as Json | undefined)?.id) ??
+        num(raw.qualificationId);
+    const expiresAt =
+        str(raw.endsAt) ?? str(raw.expiresAt) ?? str(raw.expires_at) ?? str(raw.expiry);
+
+    return { id, memberId, qualId, expiresAt };
 }

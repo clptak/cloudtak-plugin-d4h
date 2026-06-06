@@ -41,10 +41,15 @@ Pagination: `?page=0&size=100` (0-indexed), deduped by record `id`.
 | 3 | **`/equipment-categories`** | `{ results: [{ id, title, … }] }` | id → title map; resolves **Category** on each item. | Not stored separately — only resolved `category` string |
 | 4 | **`/equipment-brands`** | `{ results: [{ id, title, … }] }` | id → title map; fills **Make** when inline brand has no title. | Not stored separately — only resolved `make` |
 | 5 | **`/equipment-models`** | `{ results: [{ id, title, brand: { id }, … }] }` | Fills **Model** when missing; can supply brand id for **Make**. | Not stored separately — only resolved `model` / `make` |
-| 6 | **`/member-qualifications`** (fallback: `/qualification-awards`) | Qualification awards with `memberId`, name, expiry, etc. | Joined onto members by `memberId`. | Yes → `members[].qualifications[]` |
+| 6 | **`/member-qualifications`** | Qualification **catalog** — `{ id, title }` definitions, **no member link**. | id → title map (resolves award titles). | Not stored separately |
+| 7 | **`/member-qualification-awards`** | Award records linking `member: { id }` → `qualification: { id }` with `startsAt`/`endsAt`. | Title resolved from catalog (#6); grouped by member, latest award per qualification kept. | Yes → `members[].qualifications[]` |
 
-Endpoints 3–6 are **best-effort** (404 → warning, sync continues). Raw D4H JSON is never
+Endpoints 3–7 are **best-effort** (404 → warning, sync continues). Raw D4H JSON is never
 cached — only the normalized roster.
+
+> **Qualifications are two-part in D4H.** `/member-qualifications` is just the *catalog* of
+> definitions (no member link); who-holds-what lives in `/member-qualification-awards`. Both
+> are required to build each member's `qualifications[]`.
 
 ---
 

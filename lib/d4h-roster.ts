@@ -16,8 +16,8 @@ import KV from '../../../src/base/kv.ts';
 import { liveQuery, type Observable } from 'dexie';
 import { db } from '../../../src/database.ts';
 
-import { fetchMembers, fetchEquipment, fetchEquipmentCategories, fetchEquipmentBrands, fetchEquipmentModels, fetchQualifications } from './d4h-client.ts';
-import { normalizeMember, normalizeEquipment, normalizeEquipmentCategory, normalizeEquipmentBrand, normalizeEquipmentModel, normalizeQualification } from './d4h-normalize.ts';
+import { fetchMembers, fetchEquipment, fetchEquipmentCategories, fetchEquipmentBrands, fetchEquipmentModels, fetchQualificationCatalog, fetchQualificationAwards } from './d4h-client.ts';
+import { normalizeMember, normalizeEquipment, normalizeEquipmentCategory, normalizeEquipmentBrand, normalizeEquipmentModel, normalizeQualificationDef, normalizeQualificationAward } from './d4h-normalize.ts';
 import { categoryIsWanted, WANTED_CATEGORY_KEYWORDS } from './d4h-equipment-categories.ts';
 import { isOperationalEquipmentStatus } from './d4h-status.ts';
 import type { D4HConfig } from './d4h-config.ts';
@@ -191,22 +191,39 @@ export async function syncNow(config: D4HConfig): Promise<SyncResult> {
         );
     }
 
-    // Qualifications — best-effort; join onto members by memberId.
-    const qualResp = await fetchQualifications(config);
-    if (qualResp.warning) warnings.push(qualResp.warning);
-    const qualsByMember = new Map<number, D4HQualification[]>();
-    for (const raw of qualResp.records) {
-        const q = normalizeQualification(raw);
-        if (!q || q.memberId == null) continue;
-        const list = qualsByMember.get(q.memberId) ?? [];
-        list.push(q);
-        qualsByMember.set(q.memberId, list);
+    // Qualifications are a TWO-part model in D4H: a catalog of definitions (id → title,
+    // no member link) plus award records (member → qualification id, with dates). We pull
+    // both, resolve each award's title from the catalog, group by member, and collapse
+    // repeat awards of the same qualification down to the latest (most recent expiry).
+    const qualCatResp = await fetchQualificationCatalog(config);
+    if (qualCatResp.warning) warnings.push(qualCatResp.warning);
+    const qualTitleById = new Map<number, string>();
+    for (const raw of qualCatResp.records) {
+        const d = normalizeQualificationDef(raw);
+        if (d) qualTitleById.set(d.id, d.title);
     }
-    if (qualsByMember.size > 0) {
-        for (const m of members) {
-            const list = qualsByMember.get(m.id);
-            if (list && list.length) m.qualifications = list;
+
+    const awardResp = await fetchQualificationAwards(config);
+    if (awardResp.warning) warnings.push(awardResp.warning);
+    const qualsByMember = new Map<number, D4HQualification[]>();
+    for (const raw of awardResp.records) {
+        const a = normalizeQualificationAward(raw);
+        if (!a) continue;
+        const name = (a.qualId != null ? qualTitleById.get(a.qualId) : undefined)
+            ?? `Qualification ${a.qualId ?? a.id}`;
+        const list = qualsByMember.get(a.memberId) ?? [];
+        list.push({ id: a.qualId ?? a.id, name, expiresAt: a.expiresAt, memberId: a.memberId });
+        qualsByMember.set(a.memberId, list);
+    }
+    for (const m of members) {
+        const list = qualsByMember.get(m.id);
+        if (!list || !list.length) continue;
+        const latestByName = new Map<string, D4HQualification>();
+        for (const q of list) {
+            const prev = latestByName.get(q.name);
+            if (!prev || (q.expiresAt ?? '') > (prev.expiresAt ?? '')) latestByName.set(q.name, q);
         }
+        m.qualifications = [...latestByName.values()].sort((a, b) => a.name.localeCompare(b.name));
     }
 
     const stats = {
@@ -221,9 +238,9 @@ export async function syncNow(config: D4HConfig): Promise<SyncResult> {
             reportedTotal: equipResp.reportedTotal,
         },
         qualifications: {
-            pages:         qualResp.pages,
-            rawCount:      qualResp.records.length,
-            reportedTotal: qualResp.reportedTotal,
+            pages:         awardResp.pages,
+            rawCount:      awardResp.records.length,
+            reportedTotal: awardResp.reportedTotal,
         },
     };
 
