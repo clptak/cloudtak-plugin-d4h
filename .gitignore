@@ -7,3 +7,4 @@ dist/
 spike/**/*.local.sh
 spike/**/.env*
 docs/HANDOFF-incident-entry.md
+docs/d4h_swagger.json
