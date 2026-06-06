@@ -6,3 +6,4 @@ dist/
 # spike artifacts may contain tokens if you tweak the env vars locally
 spike/**/*.local.sh
 spike/**/.env*
+docs/HANDOFF-incident-entry.md

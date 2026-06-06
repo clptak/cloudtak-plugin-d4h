@@ -47,7 +47,7 @@
                         type='number'
                         min='1'
                         class='form-control form-control-sm'
-                        placeholder='e.g. 12345'
+                        placeholder='e.g. 123'
                         required
                     >
                 </div>
