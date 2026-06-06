@@ -1,23 +1,43 @@
 <template>
     <div class='d-flex flex-column h-100 overflow-auto p-3'>
-        <h5 class='mb-3'>D4H connection</h5>
+        <h5 class='mb-3'>
+            D4H connection
+        </h5>
 
         <form @submit.prevent='onSave'>
             <div class='row g-2'>
                 <div class='col-12 col-md-4'>
                     <label class='form-label small fw-semibold'>Region</label>
-                    <select v-model='form.region' class='form-select form-select-sm'>
-                        <option value='us'>us</option>
-                        <option value='eu'>eu</option>
-                        <option value='ap'>ap</option>
-                        <option value='ca'>ca</option>
+                    <select
+                        v-model='form.region'
+                        class='form-select form-select-sm'
+                    >
+                        <option value='us'>
+                            us
+                        </option>
+                        <option value='eu'>
+                            eu
+                        </option>
+                        <option value='ap'>
+                            ap
+                        </option>
+                        <option value='ca'>
+                            ca
+                        </option>
                     </select>
                 </div>
                 <div class='col-12 col-md-4'>
                     <label class='form-label small fw-semibold'>Context</label>
-                    <select v-model='form.context' class='form-select form-select-sm'>
-                        <option value='team'>team</option>
-                        <option value='organization'>organization</option>
+                    <select
+                        v-model='form.context'
+                        class='form-select form-select-sm'
+                    >
+                        <option value='team'>
+                            team
+                        </option>
+                        <option value='organization'>
+                            organization
+                        </option>
                     </select>
                 </div>
                 <div class='col-12 col-md-4'>
@@ -29,7 +49,7 @@
                         class='form-control form-control-sm'
                         placeholder='e.g. 12345'
                         required
-                    />
+                    >
                 </div>
             </div>
 
@@ -42,7 +62,7 @@
                     type='url'
                     class='form-control form-control-sm font-monospace'
                     :placeholder='regionDefaultUrl'
-                />
+                >
             </div>
 
             <div class='mt-2'>
@@ -54,7 +74,7 @@
                     class='form-control form-control-sm font-monospace'
                     placeholder='Paste D4H Bearer token'
                     required
-                />
+                >
                 <div class='form-text small'>
                     Stored locally via Capacitor Preferences (Keychain / EncryptedSharedPreferences on
                     native; localStorage on web). Never sent to the CloudTAK server.
@@ -62,7 +82,11 @@
             </div>
 
             <div class='mt-3 d-flex gap-2 flex-wrap align-items-center'>
-                <button type='submit' class='btn btn-primary btn-sm' :disabled='!canSubmit || saving'>
+                <button
+                    type='submit'
+                    class='btn btn-primary btn-sm'
+                    :disabled='!canSubmit || saving'
+                >
                     {{ saving ? 'Saving…' : 'Save' }}
                 </button>
                 <button
@@ -78,19 +102,32 @@
                     type='button'
                     class='btn btn-outline-danger btn-sm ms-auto'
                     @click='onClear'
-                >Clear saved config</button>
+                >
+                    Clear saved config
+                </button>
             </div>
         </form>
 
-        <div v-if='status' class='alert alert-dismissible fade show alert-sm mt-3 small' :class='statusClass'>
+        <div
+            v-if='status'
+            class='alert alert-dismissible fade show alert-sm mt-3 small'
+            :class='statusClass'
+        >
             <button
                 type='button'
                 class='btn-close'
                 aria-label='Close'
                 @click='status = null'
             />
-            <div class='fw-semibold'>{{ status.title }}</div>
-            <div v-if='status.detail' style='white-space:pre-wrap'>{{ status.detail }}</div>
+            <div class='fw-semibold'>
+                {{ status.title }}
+            </div>
+            <div
+                v-if='status.detail'
+                style='white-space:pre-wrap'
+            >
+                {{ status.detail }}
+            </div>
         </div>
     </div>
 </template>

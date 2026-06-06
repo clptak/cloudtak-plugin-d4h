@@ -15,24 +15,36 @@
         />
 
         <!-- Roster pane -->
-        <div v-else-if='loaded && hasConfig' class='flex-grow-1 overflow-auto p-3'>
+        <div
+            v-else-if='loaded && hasConfig'
+            class='flex-grow-1 overflow-auto p-3'
+        >
             <div class='d-flex align-items-center gap-2 flex-wrap mb-3'>
                 <button
                     class='btn btn-primary btn-sm'
                     :disabled='syncing'
                     @click='onSync'
                 >
-                    <span v-if='syncing' class='spinner-border spinner-border-sm me-1' />
+                    <span
+                        v-if='syncing'
+                        class='spinner-border spinner-border-sm me-1'
+                    />
                     {{ syncing ? 'Syncing…' : 'Sync now' }}
                 </button>
-                <span v-if='meta' class='text-muted small'>
+                <span
+                    v-if='meta'
+                    class='text-muted small'
+                >
                     Last sync: <span :title='meta.fetchedAt'>{{ relativeFetchedAt }}</span> ·
                     {{ meta.memberCount }} member{{ meta.memberCount === 1 ? '' : 's' }}
                     <span v-if='meta.equipmentCount > 0'>
                         · {{ meta.equipmentCount }} equipment item{{ meta.equipmentCount === 1 ? '' : 's' }}
                     </span>
                 </span>
-                <span v-else class='text-muted small'>No sync yet.</span>
+                <span
+                    v-else
+                    class='text-muted small'
+                >No sync yet.</span>
 
                 <button
                     class='btn btn-outline-secondary btn-sm ms-auto'
@@ -53,8 +65,15 @@
                     aria-label='Close'
                     @click='syncStatus = null'
                 />
-                <div class='fw-semibold'>{{ syncStatus.title }}</div>
-                <div v-if='syncStatus.detail' style='white-space:pre-wrap'>{{ syncStatus.detail }}</div>
+                <div class='fw-semibold'>
+                    {{ syncStatus.title }}
+                </div>
+                <div
+                    v-if='syncStatus.detail'
+                    style='white-space:pre-wrap'
+                >
+                    {{ syncStatus.detail }}
+                </div>
             </div>
 
             <div
@@ -67,9 +86,16 @@
                     aria-label='Close'
                     @click='warningsDismissed = true'
                 />
-                <div class='fw-semibold mb-1'>Sync warnings ({{ meta.warnings.length }})</div>
+                <div class='fw-semibold mb-1'>
+                    Sync warnings ({{ meta.warnings.length }})
+                </div>
                 <ul class='mb-0 ps-3'>
-                    <li v-for='(w, i) in meta.warnings' :key='i'>{{ w }}</li>
+                    <li
+                        v-for='(w, i) in meta.warnings'
+                        :key='i'
+                    >
+                        {{ w }}
+                    </li>
                 </ul>
             </div>
 
@@ -87,158 +113,234 @@
 
             <!-- Personnel -->
             <div v-if='activeTab === "personnel"'>
-            <div v-if='roster?.members?.length' class='card mb-3'>
-                <div class='card-header py-1 px-2 d-flex align-items-center gap-2 flex-wrap'>
-                    <span class='small fw-semibold'>
-                        Personnel ({{ filteredMembers.length }}<span v-if='filteredMembers.length !== roster.members.length' class='text-muted fw-normal'> of {{ roster.members.length }}</span>)
-                    </span>
-                    <input
-                        v-model='filter'
-                        type='search'
-                        class='form-control form-control-sm ms-auto'
-                        style='max-width:240px'
-                        placeholder='Filter by name, badge, position, mobile…'
-                    />
-                </div>
-                <div class='table-responsive' style='max-height:50vh;overflow:auto'>
-                    <table class='table table-sm table-hover mb-0 small'>
-                        <thead class='sticky-top bg-body'>
-                            <tr>
-                                <th
-                                    style='width:72px;cursor:pointer;user-select:none'
-                                    @click='toggleSort("badge")'
+                <div
+                    v-if='roster?.members?.length'
+                    class='card mb-3'
+                >
+                    <div class='card-header py-1 px-2 d-flex align-items-center gap-2 flex-wrap'>
+                        <span class='small fw-semibold'>
+                            Personnel ({{ filteredMembers.length }}<span
+                                v-if='filteredMembers.length !== roster.members.length'
+                                class='text-muted fw-normal'
+                            > of {{ roster.members.length }}</span>)
+                        </span>
+                        <input
+                            v-model='filter'
+                            type='search'
+                            class='form-control form-control-sm ms-auto'
+                            style='max-width:240px'
+                            placeholder='Filter by name, badge, position, mobile…'
+                        >
+                    </div>
+                    <div
+                        class='table-responsive'
+                        style='max-height:50vh;overflow:auto'
+                    >
+                        <table class='table table-sm table-hover mb-0 small'>
+                            <thead class='sticky-top bg-body'>
+                                <tr>
+                                    <th
+                                        style='width:72px;cursor:pointer;user-select:none'
+                                        @click='toggleSort("badge")'
+                                    >
+                                        Badge
+                                        <span
+                                            v-if='sortBy === "badge"'
+                                            class='text-muted ms-1'
+                                        >{{ sortDir === "asc" ? "▲" : "▼" }}</span>
+                                    </th>
+                                    <th
+                                        style='cursor:pointer;user-select:none'
+                                        @click='toggleSort("name")'
+                                    >
+                                        Name
+                                        <span
+                                            v-if='sortBy === "name"'
+                                            class='text-muted ms-1'
+                                        >{{ sortDir === "asc" ? "▲" : "▼" }}</span>
+                                    </th>
+                                    <th>Position</th>
+                                    <th style='width:150px'>
+                                        Mobile
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr
+                                    v-for='m in sortedMembers'
+                                    :key='m.id'
                                 >
-                                    Badge
-                                    <span v-if='sortBy === "badge"' class='text-muted ms-1'>{{ sortDir === "asc" ? "▲" : "▼" }}</span>
-                                </th>
-                                <th
-                                    style='cursor:pointer;user-select:none'
-                                    @click='toggleSort("name")'
-                                >
-                                    Name
-                                    <span v-if='sortBy === "name"' class='text-muted ms-1'>{{ sortDir === "asc" ? "▲" : "▼" }}</span>
-                                </th>
-                                <th>Position</th>
-                                <th style='width:150px'>Mobile</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr v-for='m in sortedMembers' :key='m.id'>
-                                <td class='font-monospace'>{{ m.ref ?? '—' }}</td>
-                                <td>{{ m.name }}</td>
-                                <td class='text-muted'>{{ m.position ?? '' }}</td>
-                                <td class='font-monospace'>{{ m.mobile ?? '—' }}</td>
-                            </tr>
-                            <tr v-if='sortedMembers.length === 0'>
-                                <td colspan='4' class='text-center text-muted py-3'>
-                                    No members match the filter.
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+                                    <td class='font-monospace'>
+                                        {{ m.ref ?? '—' }}
+                                    </td>
+                                    <td>{{ m.name }}</td>
+                                    <td class='text-muted'>
+                                        {{ m.position ?? '' }}
+                                    </td>
+                                    <td class='font-monospace'>
+                                        {{ m.mobile ?? '—' }}
+                                    </td>
+                                </tr>
+                                <tr v-if='sortedMembers.length === 0'>
+                                    <td
+                                        colspan='4'
+                                        class='text-center text-muted py-3'
+                                    >
+                                        No members match the filter.
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
-            </div>
-            <div v-else class='text-muted small text-center py-4'>
-                No personnel synced yet.
-            </div>
+                <div
+                    v-else
+                    class='text-muted small text-center py-4'
+                >
+                    No personnel synced yet.
+                </div>
             </div>
 
             <!-- Equipment -->
             <div v-else-if='activeTab === "equipment"'>
-            <div v-if='roster?.equipment?.length || meta?.equipmentCategories?.length' class='card mb-3'>
-                <div class='card-header py-1 px-2 d-flex align-items-center gap-2 flex-wrap'>
-                    <span class='small fw-semibold'>
-                        Equipment ({{ filteredEquipment.length }}<span v-if='filteredEquipment.length !== (roster?.equipment?.length ?? 0)' class='text-muted fw-normal'> of {{ roster?.equipment?.length ?? 0 }}</span>)
-                    </span>
-                    <input
-                        v-model='equipFilter'
-                        type='search'
-                        class='form-control form-control-sm ms-auto'
-                        style='max-width:240px'
-                        placeholder='Filter by id, type, make, model, category…'
-                    />
-                </div>
+                <div
+                    v-if='roster?.equipment?.length || meta?.equipmentCategories?.length'
+                    class='card mb-3'
+                >
+                    <div class='card-header py-1 px-2 d-flex align-items-center gap-2 flex-wrap'>
+                        <span class='small fw-semibold'>
+                            Equipment ({{ filteredEquipment.length }}<span
+                                v-if='filteredEquipment.length !== (roster?.equipment?.length ?? 0)'
+                                class='text-muted fw-normal'
+                            > of {{ roster?.equipment?.length ?? 0 }}</span>)
+                        </span>
+                        <input
+                            v-model='equipFilter'
+                            type='search'
+                            class='form-control form-control-sm ms-auto'
+                            style='max-width:240px'
+                            placeholder='Filter by id, type, make, model, category…'
+                        >
+                    </div>
 
-                <!-- Discovered categories — green = kept by the vehicles/UAS/tech-litter filter.
+                    <!-- Discovered categories — green = kept by the vehicles/UAS/tech-litter filter.
                      If the ones you want aren't green, the label differs; tweak
                      WANTED_CATEGORY_KEYWORDS in lib/d4h-equipment-categories.ts. -->
+                    <div
+                        v-if='meta?.equipmentCategories?.length'
+                        class='px-2 py-1 small border-bottom d-flex flex-wrap gap-1 align-items-center'
+                    >
+                        <span class='text-muted me-1'>Categories found:</span>
+                        <span
+                            v-for='c in meta.equipmentCategories'
+                            :key='c.title'
+                            class='badge'
+                            :class='c.included ? "bg-success" : "bg-light text-muted border"'
+                            :title='c.included ? "Kept by the vehicles / UAS / tech-litter filter" : "Not in the wanted categories"'
+                        >{{ c.title }} ({{ c.count }})</span>
+                    </div>
+                    <div
+                        class='table-responsive'
+                        style='max-height:50vh;overflow:auto'
+                    >
+                        <table class='table table-sm table-hover mb-0 small'>
+                            <thead class='sticky-top bg-body'>
+                                <tr>
+                                    <th
+                                        style='width:72px;cursor:pointer;user-select:none'
+                                        @click='toggleEquipSort("ref")'
+                                    >
+                                        ID
+                                        <span
+                                            v-if='equipSortBy === "ref"'
+                                            class='text-muted ms-1'
+                                        >{{ equipSortDir === "asc" ? "▲" : "▼" }}</span>
+                                    </th>
+                                    <th
+                                        style='cursor:pointer;user-select:none'
+                                        @click='toggleEquipSort("type")'
+                                    >
+                                        Type
+                                        <span
+                                            v-if='equipSortBy === "type"'
+                                            class='text-muted ms-1'
+                                        >{{ equipSortDir === "asc" ? "▲" : "▼" }}</span>
+                                    </th>
+                                    <th
+                                        style='cursor:pointer;user-select:none'
+                                        @click='toggleEquipSort("make")'
+                                    >
+                                        Make
+                                        <span
+                                            v-if='equipSortBy === "make"'
+                                            class='text-muted ms-1'
+                                        >{{ equipSortDir === "asc" ? "▲" : "▼" }}</span>
+                                    </th>
+                                    <th
+                                        style='cursor:pointer;user-select:none'
+                                        @click='toggleEquipSort("model")'
+                                    >
+                                        Model
+                                        <span
+                                            v-if='equipSortBy === "model"'
+                                            class='text-muted ms-1'
+                                        >{{ equipSortDir === "asc" ? "▲" : "▼" }}</span>
+                                    </th>
+                                    <th
+                                        style='width:160px;cursor:pointer;user-select:none'
+                                        @click='toggleEquipSort("category")'
+                                    >
+                                        Category
+                                        <span
+                                            v-if='equipSortBy === "category"'
+                                            class='text-muted ms-1'
+                                        >{{ equipSortDir === "asc" ? "▲" : "▼" }}</span>
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr
+                                    v-for='e in sortedEquipment'
+                                    :key='e.id'
+                                >
+                                    <td class='font-monospace'>
+                                        {{ e.ref ?? '—' }}
+                                    </td>
+                                    <td>{{ e.name }}</td>
+                                    <td class='text-muted'>
+                                        {{ e.make ?? '—' }}
+                                    </td>
+                                    <td class='text-muted'>
+                                        {{ e.model ?? '—' }}
+                                    </td>
+                                    <td class='text-muted'>
+                                        {{ e.category ?? '—' }}
+                                    </td>
+                                </tr>
+                                <tr v-if='sortedEquipment.length === 0'>
+                                    <td
+                                        colspan='5'
+                                        class='text-center text-muted py-3'
+                                    >
+                                        {{ equipFilter ? 'No equipment matches the filter.' : 'No operational equipment in the wanted categories — see "Categories found" above.' }}
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
                 <div
-                    v-if='meta?.equipmentCategories?.length'
-                    class='px-2 py-1 small border-bottom d-flex flex-wrap gap-1 align-items-center'
+                    v-else
+                    class='text-muted small text-center py-4'
                 >
-                    <span class='text-muted me-1'>Categories found:</span>
-                    <span
-                        v-for='c in meta.equipmentCategories'
-                        :key='c.title'
-                        class='badge'
-                        :class='c.included ? "bg-success" : "bg-light text-muted border"'
-                        :title='c.included ? "Kept by the vehicles / UAS / tech-litter filter" : "Not in the wanted categories"'
-                    >{{ c.title }} ({{ c.count }})</span>
+                    No operational equipment in the wanted categories — sync to discover categories.
                 </div>
-                <div class='table-responsive' style='max-height:50vh;overflow:auto'>
-                    <table class='table table-sm table-hover mb-0 small'>
-                        <thead class='sticky-top bg-body'>
-                            <tr>
-                                <th
-                                    style='width:72px;cursor:pointer;user-select:none'
-                                    @click='toggleEquipSort("ref")'
-                                >
-                                    ID
-                                    <span v-if='equipSortBy === "ref"' class='text-muted ms-1'>{{ equipSortDir === "asc" ? "▲" : "▼" }}</span>
-                                </th>
-                                <th
-                                    style='cursor:pointer;user-select:none'
-                                    @click='toggleEquipSort("type")'
-                                >
-                                    Type
-                                    <span v-if='equipSortBy === "type"' class='text-muted ms-1'>{{ equipSortDir === "asc" ? "▲" : "▼" }}</span>
-                                </th>
-                                <th
-                                    style='cursor:pointer;user-select:none'
-                                    @click='toggleEquipSort("make")'
-                                >
-                                    Make
-                                    <span v-if='equipSortBy === "make"' class='text-muted ms-1'>{{ equipSortDir === "asc" ? "▲" : "▼" }}</span>
-                                </th>
-                                <th
-                                    style='cursor:pointer;user-select:none'
-                                    @click='toggleEquipSort("model")'
-                                >
-                                    Model
-                                    <span v-if='equipSortBy === "model"' class='text-muted ms-1'>{{ equipSortDir === "asc" ? "▲" : "▼" }}</span>
-                                </th>
-                                <th
-                                    style='width:160px;cursor:pointer;user-select:none'
-                                    @click='toggleEquipSort("category")'
-                                >
-                                    Category
-                                    <span v-if='equipSortBy === "category"' class='text-muted ms-1'>{{ equipSortDir === "asc" ? "▲" : "▼" }}</span>
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr v-for='e in sortedEquipment' :key='e.id'>
-                                <td class='font-monospace'>{{ e.ref ?? '—' }}</td>
-                                <td>{{ e.name }}</td>
-                                <td class='text-muted'>{{ e.make ?? '—' }}</td>
-                                <td class='text-muted'>{{ e.model ?? '—' }}</td>
-                                <td class='text-muted'>{{ e.category ?? '—' }}</td>
-                            </tr>
-                            <tr v-if='sortedEquipment.length === 0'>
-                                <td colspan='5' class='text-center text-muted py-3'>
-                                    {{ equipFilter ? 'No equipment matches the filter.' : 'No operational equipment in the wanted categories — see "Categories found" above.' }}
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-            <div v-else class='text-muted small text-center py-4'>
-                No operational equipment in the wanted categories — sync to discover categories.
-            </div>
             </div>
 
-            <div v-if='showConfig' class='border-top pt-3'>
+            <div
+                v-if='showConfig'
+                class='border-top pt-3'
+            >
                 <ConfigView
                     @saved='onConfigSaved'
                     @cleared='onConfigCleared'
@@ -246,7 +348,10 @@
             </div>
         </div>
 
-        <div v-else class='flex-grow-1 d-flex align-items-center justify-content-center text-muted small'>
+        <div
+            v-else
+            class='flex-grow-1 d-flex align-items-center justify-content-center text-muted small'
+        >
             Loading…
         </div>
     </div>

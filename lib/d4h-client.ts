@@ -242,7 +242,8 @@ async function fetchAllPages(
             );
         }
 
-        const { results: _ignore, ...envelopeMeta } = body as Record<string, unknown>;
+        const envelopeMeta = { ...(body as Record<string, unknown>) };
+        delete envelopeMeta.results;
         console.debug(
             `[d4h] ${path} page ${page}: returned ${results.length} rows, ${newlyAdded} new ` +
             `(total so far ${all.length}${reportedTotal != null ? ` / ${reportedTotal}` : ''})`,

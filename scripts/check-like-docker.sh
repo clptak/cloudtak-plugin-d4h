@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
-# Simulate CloudTAK Docker: vue-tsc from api/web without plugin node_modules.
+# Simulate CloudTAK Docker web build gate for this plugin:
+#   npm run lint && npm run check && npm run build  (from api/web, no plugin node_modules)
 set -euo pipefail
 
 WEB="${1:-$HOME/CloudTAK/api/web}"
-PLUGIN_NM="$WEB/plugins/schedule/node_modules"
+PLUGIN_SLUG="${PLUGIN_SLUG:-cloudtak-plugin-d4h}"
+PLUGIN_DIR="plugins/${PLUGIN_SLUG}"
+PLUGIN_NM="$WEB/$PLUGIN_DIR/node_modules"
 BACKUP=""
 
 if [[ -d "$PLUGIN_NM" ]]; then
@@ -21,11 +24,22 @@ cleanup() {
 trap cleanup EXIT
 
 cd "$WEB"
+
+echo "==> eslint $PLUGIN_DIR"
+npx eslint --config eslint.config.js "./$PLUGIN_DIR/"
+
+echo "==> vue-tsc (host check; fail only on $PLUGIN_DIR errors)"
+set +e
 npm run check 2>&1 | tee /tmp/cloudtak-check.log
-if grep -q 'plugins/schedule/' /tmp/cloudtak-check.log; then
+set -e
+if grep -q "${PLUGIN_DIR}/" /tmp/cloudtak-check.log; then
   echo >&2
-  echo "schedule plugin errors — merge host deps or install plugin packages before check:" >&2
-  echo "  bash plugins/schedule/scripts/merge-cloudtak-web-deps.sh package.json  # then rebuild image" >&2
+  echo "${PLUGIN_SLUG} vue-tsc errors — fix types or ensure deps come from api/web package.json:" >&2
+  grep "${PLUGIN_DIR}/" /tmp/cloudtak-check.log >&2
   exit 1
 fi
-echo "check passed (no plugins/schedule/ errors)"
+
+echo "==> vite build"
+npm run build
+
+echo "check passed (eslint + no ${PLUGIN_DIR}/ vue-tsc errors + build)"
