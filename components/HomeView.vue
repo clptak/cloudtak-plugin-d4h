@@ -177,7 +177,7 @@
                             </tr>
                             <tr v-if='sortedEquipment.length === 0'>
                                 <td colspan='3' class='text-center text-muted py-3'>
-                                    No equipment matches the filter.
+                                    {{ equipFilter ? 'No equipment matches the filter.' : 'No equipment in the wanted categories — see "Categories found" above.' }}
                                 </td>
                             </tr>
                         </tbody>
