@@ -1,0 +1,115 @@
+<!doctype html>
+<!--
+  Phase 0 CORS spike — real-browser check.
+
+  Serve this from any local origin and click "Run". The browser will do a
+  real preflight + GET against D4H. If the browser blocks the response on
+  CORS grounds you'll see it here (and in the devtools Network tab) even
+  though check-cors.sh said the headers looked fine — that's the whole
+  reason to run this as well.
+
+  Quickest way to serve it:
+    cd spike/phase-0-cors && python3 -m http.server 8080
+    open http://localhost:8080/browser-test.html
+
+  Note: localhost:8080 is *not* your prod CloudTAK origin, so a failure here
+  with a passing check-cors.sh just means D4H's allowlist excludes localhost.
+  Re-run check-cors.sh with ORIGIN set to your real CloudTAK hostname for the
+  authoritative answer.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>D4H CORS spike</title>
+  <style>
+    body { font: 14px/1.4 system-ui, sans-serif; max-width: 720px; margin: 2rem auto; padding: 0 1rem; }
+    label { display: block; margin: 0.5rem 0 0.25rem; font-weight: 600; }
+    input, select { width: 100%; padding: 0.4rem; box-sizing: border-box; }
+    button { margin-top: 1rem; padding: 0.5rem 1rem; font-size: 14px; cursor: pointer; }
+    pre { background: #111; color: #eee; padding: 1rem; overflow: auto; max-height: 50vh; }
+    .ok  { color: #2a7; font-weight: 600; }
+    .bad { color: #c33; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <h1>D4H Phase 0 — browser CORS check</h1>
+  <p>Origin this page is running from: <code id="origin"></code></p>
+
+  <label>Region
+    <select id="region">
+      <option value="us">us</option>
+      <option value="eu">eu</option>
+      <option value="ap">ap</option>
+      <option value="ca">ca</option>
+    </select>
+  </label>
+
+  <label>Context
+    <select id="context">
+      <option value="team">team</option>
+      <option value="organization">organization</option>
+    </select>
+  </label>
+
+  <label>Context ID
+    <input id="contextId" placeholder="e.g. 12345" />
+  </label>
+
+  <label>D4H access token
+    <input id="token" type="password" autocomplete="off" placeholder="Bearer token (paste, not stored)" />
+  </label>
+
+  <button id="run">Run</button>
+
+  <h2>Result</h2>
+  <p id="verdict">—</p>
+  <pre id="out">(no run yet)</pre>
+
+<script>
+  document.getElementById('origin').textContent = location.origin;
+
+  document.getElementById('run').addEventListener('click', async () => {
+    const region    = document.getElementById('region').value;
+    const context   = document.getElementById('context').value;
+    const contextId = document.getElementById('contextId').value.trim();
+    const token     = document.getElementById('token').value.trim();
+    const verdict   = document.getElementById('verdict');
+    const out       = document.getElementById('out');
+
+    if (!contextId || !token) {
+      verdict.innerHTML = '<span class="bad">Need contextId and token.</span>';
+      return;
+    }
+
+    const url = `https://api.team-manager.${region}.d4h.com/v3/${context}/${contextId}/members`;
+    verdict.textContent = 'Calling ' + url + ' …';
+    out.textContent = '';
+
+    try {
+      const res = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': 'Bearer ' + token,
+          'Accept': 'application/json',
+        },
+      });
+      const text = await res.text();
+      let body;
+      try { body = JSON.parse(text); } catch { body = text; }
+
+      if (res.ok) {
+        verdict.innerHTML = `<span class="ok">OK — HTTP ${res.status}.</span> Browser allowed the response. Client-side-direct works from <code>${location.origin}</code>.`;
+      } else {
+        verdict.innerHTML = `<span class="bad">HTTP ${res.status}.</span> Auth or path issue — not a CORS failure (the response came through).`;
+      }
+      out.textContent = typeof body === 'string'
+        ? body.slice(0, 4000)
+        : JSON.stringify(body, null, 2).slice(0, 4000);
+    } catch (e) {
+      verdict.innerHTML = `<span class="bad">Fetch failed (likely CORS).</span> Check the devtools Network tab — if the preflight (OPTIONS) is missing <code>Access-Control-Allow-Origin</code> for <code>${location.origin}</code>, D4H is blocking this origin. Fall back to the server-proxy route (plan §3).`;
+      out.textContent = String(e);
+    }
+  });
+</script>
+</body>
+</html>

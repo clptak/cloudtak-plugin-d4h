@@ -1,0 +1,25 @@
+{
+    "name": "cloudtak-plugin-d4h",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "description": "CloudTAK plugin — D4H Team Manager roster + cross-plugin personnel/equipment source",
+    "scripts": {
+        "lint":  "eslint .",
+        "check": "vue-tsc --noEmit"
+    },
+    "peerDependencies": {
+        "@capacitor/preferences":  "*",
+        "@tak-ps/cloudtak":        "*",
+        "@tabler/icons-vue":       "*",
+        "vue":                     "^3.5.0"
+    },
+    "devDependencies": {
+        "@capacitor/preferences":  "^7.0.4",
+        "@tak-ps/cloudtak":        "*",
+        "@tabler/icons-vue":       "^3.31.0",
+        "typescript":              "^5.0.0",
+        "vue":                     "^3.5.0",
+        "vue-tsc":                 "^3.2.2"
+    }
+}

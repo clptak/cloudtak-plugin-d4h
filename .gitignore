@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.DS_Store
+*.log
+
+# spike artifacts may contain tokens if you tweak the env vars locally
+spike/**/*.local.sh
+spike/**/.env*
