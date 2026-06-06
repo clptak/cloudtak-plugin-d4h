@@ -41,11 +41,15 @@ export interface D4HMember {
 export interface D4HEquipment {
     id:         number;
     ref?:       string;
-    name:       string;
-    categoryId?: number;             // D4H EquipmentCategory id (records reference category by id only)
-    category?:  string;              // resolved category title (looked up from the category list)
+    name:       string;               // equipment kind title — shown as "Type"
+    make?:      string;
+    model?:     string;
+    brandId?:   number;              // resolved via equipment-brands when inline brand is id-only
+    modelId?:   number;
+    categoryId?: number;
+    category?:  string;
     status?:    string;
-    groups?:   string[];              // server-set (plan §4A); client cache may omit
+    groups?:   string[];
 }
 
 export interface D4HRosterMeta {

@@ -16,9 +16,10 @@ import KV from '../../../src/base/kv.ts';
 import { liveQuery, type Observable } from 'dexie';
 import { db } from '../../../src/database.ts';
 
-import { fetchMembers, fetchEquipment, fetchEquipmentCategories, fetchQualifications } from './d4h-client.ts';
-import { normalizeMember, normalizeEquipment, normalizeEquipmentCategory, normalizeQualification } from './d4h-normalize.ts';
+import { fetchMembers, fetchEquipment, fetchEquipmentCategories, fetchEquipmentBrands, fetchEquipmentModels, fetchQualifications } from './d4h-client.ts';
+import { normalizeMember, normalizeEquipment, normalizeEquipmentCategory, normalizeEquipmentBrand, normalizeEquipmentModel, normalizeQualification } from './d4h-normalize.ts';
 import { categoryIsWanted, WANTED_CATEGORY_KEYWORDS } from './d4h-equipment-categories.ts';
+import { isOperationalEquipmentStatus } from './d4h-status.ts';
 import type { D4HConfig } from './d4h-config.ts';
 import type {
     D4HMember, D4HEquipment, D4HQualification, D4HRoster, D4HRosterMeta,
@@ -124,9 +125,50 @@ export async function syncNow(config: D4HConfig): Promise<SyncResult> {
         }
     }
 
-    // Discovery: distinct categories with counts, flagged by whether the filter keeps them.
-    const categoryCounts = new Map<string, number>();
+    // Resolve brand / model titles (list rows often carry id-only refs — see D4H swagger).
+    const brandResp = await fetchEquipmentBrands(config);
+    if (brandResp.warning) warnings.push(brandResp.warning);
+    const brandTitleById = new Map<number, string>();
+    for (const raw of brandResp.records) {
+        const b = normalizeEquipmentBrand(raw);
+        if (b) brandTitleById.set(b.id, b.title);
+    }
+
+    const modelResp = await fetchEquipmentModels(config);
+    if (modelResp.warning) warnings.push(modelResp.warning);
+    const modelById = new Map<number, { title: string; brandId?: number }>();
+    for (const raw of modelResp.records) {
+        const m = normalizeEquipmentModel(raw);
+        if (m) modelById.set(m.id, { title: m.title, brandId: m.brandId });
+    }
+
     for (const e of allEquipment) {
+        if (!e.model && e.modelId != null) {
+            e.model = modelById.get(e.modelId)?.title;
+        }
+        if (!e.make) {
+            if (e.brandId != null) {
+                e.make = brandTitleById.get(e.brandId);
+            }
+            if (!e.make && e.modelId != null) {
+                const mid = modelById.get(e.modelId);
+                if (mid?.brandId != null) {
+                    e.make = brandTitleById.get(mid.brandId);
+                }
+            }
+        }
+    }
+
+    // Discovery: distinct categories with counts (operational equipment only), flagged
+    // by whether the filter keeps them.
+    const operationalEquipment = allEquipment.filter(e => isOperationalEquipmentStatus(e.status));
+    const nonOperationalEquipment = allEquipment.length - operationalEquipment.length;
+    if (nonOperationalEquipment > 0) {
+        warnings.push(`Excluded ${nonOperationalEquipment} non-operational equipment item(s).`);
+    }
+
+    const categoryCounts = new Map<string, number>();
+    for (const e of operationalEquipment) {
         const title = e.category ?? '(uncategorized)';
         categoryCounts.set(title, (categoryCounts.get(title) ?? 0) + 1);
     }
@@ -134,14 +176,14 @@ export async function syncNow(config: D4HConfig): Promise<SyncResult> {
         .map(([title, count]) => ({ title, count, included: categoryIsWanted(title) }))
         .sort((a, b) => b.count - a.count);
 
-    const equipment = allEquipment.filter(e => categoryIsWanted(e.category));
+    const equipment = operationalEquipment.filter(e => categoryIsWanted(e.category));
 
     // Flag any wanted keyword that matched nothing — almost always a label-spelling
     // mismatch the operator can fix by editing WANTED_CATEGORY_KEYWORDS.
     const unmatched = WANTED_CATEGORY_KEYWORDS.filter(
         k => !equipmentCategories.some(c => c.included && c.title.toLowerCase().includes(k)),
     );
-    if (allEquipment.length > 0 && unmatched.length > 0) {
+    if (operationalEquipment.length > 0 && unmatched.length > 0) {
         warnings.push(
             `Equipment category filter matched no items for: ${unmatched.join(', ')}. ` +
             `D4H's categories are: ${equipmentCategories.map(c => `${c.title} (${c.count})`).join(', ') || 'none'}. ` +

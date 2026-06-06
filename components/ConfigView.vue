@@ -82,7 +82,13 @@
             </div>
         </form>
 
-        <div v-if='status' class='alert alert-sm mt-3 small' :class='statusClass'>
+        <div v-if='status' class='alert alert-dismissible fade show alert-sm mt-3 small' :class='statusClass'>
+            <button
+                type='button'
+                class='btn-close'
+                aria-label='Close'
+                @click='status = null'
+            />
             <div class='fw-semibold'>{{ status.title }}</div>
             <div v-if='status.detail' style='white-space:pre-wrap'>{{ status.detail }}</div>
         </div>

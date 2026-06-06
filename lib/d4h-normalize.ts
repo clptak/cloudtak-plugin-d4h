@@ -45,6 +45,16 @@ function nestedString(obj: unknown, ...keys: string[]): string | undefined {
     return str(cur);
 }
 
+function fieldString(obj: unknown, key: string): string | undefined {
+    if (!obj || typeof obj !== 'object') return undefined;
+    const v = (obj as Json)[key];
+    if (typeof v === 'string') return str(v);
+    if (v && typeof v === 'object') {
+        return nestedString(v, 'title') ?? nestedString(v, 'name');
+    }
+    return undefined;
+}
+
 export function normalizeMember(raw: Json): D4HMember | null {
     const id = num(raw.id);
     const name = str(raw.name);
@@ -80,11 +90,28 @@ export function normalizeEquipment(raw: Json): D4HEquipment | null {
 
     const name =
         nestedString(raw.kind,  'title') ??
-        nestedString(raw.model, 'title') ??
         str(raw.name) ??
         str(raw.title) ??
         str(raw.ref) ??
         `Equipment ${id}`;
+
+    const brandId =
+        num((raw.brand as Json | undefined)?.id) ??
+        num(((raw.model as Json | undefined)?.brand as Json | undefined)?.id);
+
+    const modelId = num((raw.model as Json | undefined)?.id);
+
+    // Top-level brand often has title; model.brand is frequently id-only on list responses.
+    const make =
+        fieldString(raw, 'brand') ??
+        fieldString(raw.model, 'brand') ??
+        fieldString(raw.kind, 'brand') ??
+        fieldString(raw, 'manufacturer') ??
+        str(raw.make);
+
+    const model =
+        nestedString(raw.model, 'title') ??
+        nestedString(raw.model, 'name');
 
     // Category is referenced by id only ({ resourceType, id }); the title lives in the
     // separate EquipmentCategory list and is resolved in syncNow. Read the id from the
@@ -102,6 +129,10 @@ export function normalizeEquipment(raw: Json): D4HEquipment | null {
         id,
         ref:        str(raw.ref),
         name,
+        make,
+        model,
+        brandId,
+        modelId,
         categoryId,
         category,
         status:     str(raw.status) ?? nestedString(raw.status, 'name'),
@@ -114,6 +145,25 @@ export function normalizeEquipmentCategory(raw: Json): { id: number; title: stri
     const title = str(raw.title) ?? str(raw.name);
     if (id === undefined || !title) return null;
     return { id, title };
+}
+
+/** EquipmentBrand record → { id, title } for the id→title lookup. */
+export function normalizeEquipmentBrand(raw: Json): { id: number; title: string } | null {
+    const id = num(raw.id);
+    const title = str(raw.title) ?? str(raw.name);
+    if (id === undefined || !title) return null;
+    return { id, title };
+}
+
+/** EquipmentModel record → { id, title, brandId? } for lookups. */
+export function normalizeEquipmentModel(raw: Json): { id: number; title: string; brandId?: number } | null {
+    const id = num(raw.id);
+    const title = str(raw.title) ?? str(raw.name);
+    if (id === undefined || !title) return null;
+    const brandId =
+        num((raw.brand as Json | undefined)?.id) ??
+        num(raw.brandId);
+    return { id, title, brandId };
 }
 
 export function normalizeQualification(raw: Json): D4HQualification | null {

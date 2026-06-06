@@ -359,6 +359,61 @@ export async function fetchEquipmentCategories(config: D4HConfig): Promise<BestE
     };
 }
 
+/**
+ * Equipment brands — id → title lookup. List responses often embed brand as
+ * `{ id, resourceType }` only (especially under model.brand); the title lives here.
+ */
+export async function fetchEquipmentBrands(config: D4HConfig): Promise<BestEffortResult> {
+    const candidates = [
+        `${ctxPath(config)}/equipment-brands`,
+        `${ctxPath(config)}/equipment/brands`,
+    ];
+    const errors: string[] = [];
+    for (const path of candidates) {
+        try {
+            const r = await fetchAllPages(config, path);
+            return { records: r.records, pages: r.pages, reportedTotal: r.reportedTotal };
+        } catch (e) {
+            const err = e as Error & { status?: number };
+            errors.push(`${path}: ${err.message}`);
+            if (err.status !== 404) break;
+        }
+    }
+    return {
+        records:       [],
+        pages:         0,
+        reportedTotal: null,
+        warning:       `Equipment brands fetch failed — Make column may be blank. Tried: ${errors.join(' | ')}`,
+    };
+}
+
+/**
+ * Equipment models — id → title (+ brandId) lookup when model is id-only on equipment rows.
+ */
+export async function fetchEquipmentModels(config: D4HConfig): Promise<BestEffortResult> {
+    const candidates = [
+        `${ctxPath(config)}/equipment-models`,
+        `${ctxPath(config)}/equipment/models`,
+    ];
+    const errors: string[] = [];
+    for (const path of candidates) {
+        try {
+            const r = await fetchAllPages(config, path);
+            return { records: r.records, pages: r.pages, reportedTotal: r.reportedTotal };
+        } catch (e) {
+            const err = e as Error & { status?: number };
+            errors.push(`${path}: ${err.message}`);
+            if (err.status !== 404) break;
+        }
+    }
+    return {
+        records:       [],
+        pages:         0,
+        reportedTotal: null,
+        warning:       `Equipment models fetch failed — Model/Make may be incomplete. Tried: ${errors.join(' | ')}`,
+    };
+}
+
 /** Equipment — best-effort: a non-200 becomes a warning, members still sync. */
 export async function fetchEquipment(config: D4HConfig): Promise<BestEffortResult> {
     try {
