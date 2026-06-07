@@ -98,7 +98,8 @@
                 </div>
                 <div class='form-text small'>
                     Reads attributes from overlays that are toggled on. The map recenters on the point first.
-                    <span v-if='!hasOverlayMapping'>Add rows to <code>lib/overlay-field-map.ts</code> to enable auto-fill.</span>
+                    <span v-if='hasOverlayMapping'>Mapped fields auto-detect when you pick a point; use the button to re-run.</span>
+                    <span v-else>Add rows to <code>lib/overlay-field-map.ts</code> to enable auto-fill.</span>
                 </div>
 
                 <!-- Inspect output: layer ids + property keys for authoring the mapping -->
@@ -372,7 +373,7 @@
 </template>
 
 <script setup lang='ts'>
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { loadConfig, type D4HConfig } from '../lib/d4h-config.ts';
 import {
     peekIncidentReference,
@@ -622,6 +623,12 @@ function applyDetected(results: DetectResult[]): void {
     }
     detectStatus.value = { applied, unmatched };
 }
+
+// Auto-detect the moment a point is picked (only if a mapping exists). The detect path recenters
+// the map on the point — acceptable here because the user just chose that point.
+watch(selectedPointId, (id) => {
+    if (id != null && hasOverlayMapping) void onDetect();
+});
 
 async function onMissionChange(): Promise<void> {
     inspectResults.value = null;

@@ -108,8 +108,9 @@
                     required
                 >
                 <div class='form-text small'>
-                    Stored locally via Capacitor Preferences (Keychain / EncryptedSharedPreferences on
-                    native; localStorage on web). Never sent to the CloudTAK server.
+                    Stored locally via Capacitor Preferences. On deployed CloudTAK (non-localhost), D4H
+                    calls go through the Plugin Proxy — enable it in Admin and whitelist your D4H API
+                    origin (e.g. <code>https://api.team-manager.us.d4h.com</code>).
                 </div>
             </div>
 

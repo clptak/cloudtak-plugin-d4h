@@ -22,6 +22,7 @@
 // See docs/PLAN.md §3, §7, §8.
 
 import { effectiveBaseUrl, type D4HConfig } from './d4h-config.ts';
+import { d4hFetch, D4HTransportError, type D4HHttpResponse } from './d4h-transport.ts';
 
 export type ConnectionTestResult =
     | { ok: true;  sampleCount: number; firstName?: string; baseUrl: string }
@@ -59,9 +60,9 @@ export async function testConnection(config: D4HConfig): Promise<ConnectionTestR
     const baseUrl = effectiveBaseUrl(config);
     const url = `${baseUrl}/v3/${encodeURIComponent(config.context)}/${config.contextId}/members?size=1`;
 
-    let res: Response;
+    let res: D4HHttpResponse;
     try {
-        res = await fetch(url, {
+        res = await d4hFetch(url, {
             method:  'GET',
             headers: {
                 'Authorization': `Bearer ${config.token}`,
@@ -69,7 +70,10 @@ export async function testConnection(config: D4HConfig): Promise<ConnectionTestR
             },
         });
     } catch (e) {
-        return { ok: false, error: `Network error: ${(e as Error).message}`, baseUrl };
+        const msg = e instanceof D4HTransportError
+            ? e.message
+            : `Network error: ${(e as Error).message}`;
+        return { ok: false, error: msg, baseUrl };
     }
 
     if (!res.ok) {
@@ -189,7 +193,7 @@ async function fetchAllPages(
         // cache: 'no-store' prevents the browser from serving stale 304-cached
         // bodies — important because D4H returns different totals/results on
         // different runs and stale cache makes diagnostics worse.
-        const res = await fetch(url, {
+        const res = await d4hFetch(url, {
             method:  'GET',
             cache:   'no-store',
             headers: authHeaders(config),
@@ -509,7 +513,7 @@ async function writeJson<T = unknown>(
     const url = `${effectiveBaseUrl(config)}${path}`;
     console.debug(`[d4h] ${method} ${url}`);
 
-    const res = await fetch(url, {
+    const res = await d4hFetch(url, {
         method,
         cache:   'no-store',
         headers: writeHeaders(config),
