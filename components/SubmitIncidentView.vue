@@ -554,7 +554,9 @@ type RecenterMap = MapLike & {
 };
 
 function overlaysFromStore(): OverlayLike[] {
-    return (useMapStore().overlays ?? []) as unknown as OverlayLike[];
+    // overlays exists at runtime but is not on Store<> in CloudTAK 13.5+ typings
+    const store = useMapStore() as unknown as { overlays?: OverlayLike[] };
+    return store.overlays ?? [];
 }
 
 /** Recenter the map on the point so the overlay tiles render there, then wait for idle. */
