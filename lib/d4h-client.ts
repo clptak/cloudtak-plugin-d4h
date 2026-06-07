@@ -467,3 +467,219 @@ export async function fetchQualificationAwards(config: D4HConfig): Promise<BestE
         `${ctxPath(config)}/qualification-awards`,
     ], 'Qualification awards');
 }
+
+// ─── Writes (Phase: submit incident) ───────────────────────────────────────────
+//
+// Phase-0 CORS spike (2026-06-06, real OPTIONS from cloudtak.example.org) confirmed
+// D4H returns `Access-Control-Allow-Origin: *` and
+// `Access-Control-Allow-Methods: GET,HEAD,PUT,PATCH,POST,DELETE` with
+// `Access-Control-Allow-Headers: authorization,content-type`. So browser writes are
+// allowed cross-origin — no server proxy needed for CORS.
+//
+// IMPORTANT: because Allow-Origin is the wildcard `*`, requests must stay
+// NON-credentialed — do NOT set `credentials: 'include'` (a wildcard origin and
+// credentialed mode are mutually exclusive). The Bearer token in the Authorization
+// header is what authenticates; we never rely on cookies.
+
+/** Some D4H write endpoints (incidents reference, attendance, involved-*) are team-scoped only. */
+function teamPath(config: D4HConfig): string {
+    return `/v3/team/${config.contextId}`;
+}
+
+function writeHeaders(config: D4HConfig): HeadersInit {
+    return {
+        'Authorization': `Bearer ${config.token}`,
+        'Accept':        'application/json',
+        'Content-Type':  'application/json',
+    };
+}
+
+/**
+ * Generic JSON write (POST/PATCH). Mirrors the read path's error handling: surfaces
+ * D4H's structured Zod validation error verbatim (it names the rejected keys), and
+ * tags the thrown Error with `.status` so callers can branch (e.g. 401 → bad token,
+ * 409 → reference taken). Non-credentialed by design (see note above).
+ */
+async function writeJson<T = unknown>(
+    config: D4HConfig,
+    path:   string,
+    body:   unknown,
+    method: 'POST' | 'PATCH' = 'POST',
+): Promise<T> {
+    const url = `${effectiveBaseUrl(config)}${path}`;
+    console.debug(`[d4h] ${method} ${url}`);
+
+    const res = await fetch(url, {
+        method,
+        cache:   'no-store',
+        headers: writeHeaders(config),
+        body:    JSON.stringify(body ?? {}),
+        // NOTE: intentionally no `credentials` — wildcard CORS forbids it.
+    });
+
+    const text = await res.text().catch(() => '');
+    let parsed: unknown = undefined;
+    if (text) { try { parsed = JSON.parse(text); } catch { parsed = text; } }
+
+    if (!res.ok) {
+        const detail = typeof parsed === 'string'
+            ? parsed
+            : JSON.stringify(parsed ?? {});
+        const err = new Error(`HTTP ${res.status} ${res.statusText} — ${detail.slice(0, 400)}`);
+        (err as Error & { status?: number }).status = res.status;
+        throw err;
+    }
+
+    return parsed as T;
+}
+
+/** The D4H incident-create request body (v1 subset — see docs/PLAN-submit-incident.md). */
+export interface D4HIncidentCreate {
+    reference?:            string;        // only if team has activity auto-id enabled
+    referenceDescription?: string;        // the incident TITLE (max 100)
+    description?:          string | null; // HTML, the long text box
+    plan?:                 string | null;
+    trackingNumber?:       string | null;
+    shared?:               boolean;
+    fullTeam?:             boolean;
+    address?: {
+        country?:  string;
+        postcode?: string;
+        region?:   string;
+        street?:   string;
+        town?:     string;
+    };
+    location?: {
+        latitude:  number;   // both required *within* location when present
+        longitude: number;
+    };
+    locationBookmarkId?: number;
+    startsAt:  string;       // REQUIRED — ISO 8601, emit UTC (…Z)
+    endsAt?:   string;
+    customFieldValues?: Array<{ id: number; value: number[] | string | null }>;
+}
+
+/** A member group as needed by the (non-full-team) multi-select. */
+export interface MemberGroupOption {
+    id:    number;
+    title: string;
+}
+
+/**
+ * Peek the next available auto-id reference WITHOUT consuming it.
+ * Team has auto-id enabled (confirmed with Paul), so the create payload should carry
+ * a reference. `peek` has no side effect. Team-scoped endpoint.
+ *
+ * The v3 response shape isn't documented in the swagger; we parse defensively and
+ * return the reference string, or null if we can't find one (caller may then omit
+ * `reference` and let D4H auto-assign).
+ */
+export async function peekIncidentReference(config: D4HConfig): Promise<string | null> {
+    if (config.context !== 'team') return null; // reference/peek is team-only
+    const body = await writeJson<unknown>(config, `${teamPath(config)}/incidents/reference/peek`, {});
+    if (typeof body === 'string') return body.trim() || null;
+    if (body && typeof body === 'object') {
+        const o = body as Record<string, unknown>;
+        for (const k of ['reference', 'value', 'next', 'nextReference']) {
+            if (typeof o[k] === 'string' && (o[k] as string).trim()) return (o[k] as string).trim();
+        }
+    }
+    return null;
+}
+
+/**
+ * Create an incident. Returns the created record (parsed JSON) — callers read its
+ * `id`/`activityId` for follow-up steps (attendance, involved-persons) in later phases.
+ * Endpoint accepts either team or org context: /v3/{context}/{contextId}/incidents.
+ */
+export async function createIncident(
+    config: D4HConfig,
+    payload: D4HIncidentCreate,
+): Promise<Record<string, unknown>> {
+    return writeJson<Record<string, unknown>>(config, `${ctxPath(config)}/incidents`, payload);
+}
+
+/**
+ * Member groups for the (fullTeam=false) multi-select. Returns only `{ id, title }`.
+ * GET — reuses the paginated read path. v1 just needs the list to render the picker.
+ */
+export async function listMemberGroups(config: D4HConfig): Promise<MemberGroupOption[]> {
+    const r = await fetchAllPages(config, `${ctxPath(config)}/member-groups`);
+    return r.records
+        .map((rec) => {
+            const o = rec as Record<string, unknown>;
+            const id = typeof o.id === 'number' ? o.id : Number(o.id);
+            const title = typeof o.title === 'string' ? o.title : '';
+            return { id, title };
+        })
+        .filter((g) => Number.isFinite(g.id) && g.title !== '');
+}
+
+// ─── Custom fields (incident) ──────────────────────────────────────────────────
+
+/** D4H custom-field input types (from POST /custom-fields `type` enum). */
+export type D4HCustomFieldType =
+    | 'DATE' | 'DATETIME' | 'TIME'
+    | 'NUMBER' | 'TEXT' | 'TEXT_AREA'
+    | 'SINGLE_CHOICE' | 'MULTIPLE_CHOICE';
+
+export interface D4HCustomFieldOption {
+    id:    number;
+    label: string;
+}
+
+export interface D4HCustomField {
+    id:        number;
+    title:     string;
+    type:      D4HCustomFieldType;
+    hint?:     string;
+    mandatory: boolean;
+    /** Populated for SINGLE_CHOICE / MULTIPLE_CHOICE; empty otherwise. */
+    options:   D4HCustomFieldOption[];
+}
+
+const CHOICE_TYPES: ReadonlySet<string> = new Set(['SINGLE_CHOICE', 'MULTIPLE_CHOICE']);
+
+/**
+ * Incident custom-field definitions for the dynamic form. Filters server-side to
+ * `target_resource_type=Incident`; drops archived fields client-side (the `archived`
+ * query param's accepted type isn't documented, so we don't risk a Zod 400 on it).
+ * Choice options are read from each field's embedded `options[]`.
+ */
+export async function listIncidentCustomFields(config: D4HConfig): Promise<D4HCustomField[]> {
+    const r = await fetchAllPages(config, `${ctxPath(config)}/custom-fields`, {
+        extraQuery: { target_resource_type: 'Incident', sort: 'ordering', order: 'asc' },
+    });
+
+    const out: D4HCustomField[] = [];
+    for (const rec of r.records) {
+        const o = rec as Record<string, unknown>;
+        if (o.archived === true) continue;
+
+        const id = typeof o.id === 'number' ? o.id : Number(o.id);
+        const type = String(o.type ?? '') as D4HCustomFieldType;
+        if (!Number.isFinite(id) || !type) continue;
+
+        const rawOptions = Array.isArray(o.options) ? o.options : [];
+        const options: D4HCustomFieldOption[] = CHOICE_TYPES.has(type)
+            ? rawOptions
+                .map((op) => {
+                    const oo = op as Record<string, unknown>;
+                    const oid = typeof oo.id === 'number' ? oo.id : Number(oo.id);
+                    const label = String(oo.label ?? oo.title ?? oid);
+                    return { id: oid, label };
+                })
+                .filter((op) => Number.isFinite(op.id))
+            : [];
+
+        out.push({
+            id,
+            title:     String(o.title ?? `Field ${id}`),
+            type,
+            hint:      typeof o.hint === 'string' && o.hint ? o.hint : undefined,
+            mandatory: o.mandatory === true || o.mandatory === 'true',
+            options,
+        });
+    }
+    return out;
+}

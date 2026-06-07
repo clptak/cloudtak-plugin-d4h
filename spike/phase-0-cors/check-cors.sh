@@ -57,6 +57,31 @@ else
 fi
 echo
 
+echo "==> 1b) WRITE preflight (OPTIONS for POST) — the real question for incident submit"
+echo "        (header-only: no incident is created)"
+echo
+WRITE_URL="https://${HOST}/v3/team/${D4H_CONTEXT_ID}/incidents"
+write_pf=$(curl -sS -i -X OPTIONS "${WRITE_URL}" \
+  -H "Origin: ${ORIGIN}" \
+  -H "Access-Control-Request-Method: POST" \
+  -H "Access-Control-Request-Headers: authorization,content-type")
+echo "${write_pf}"
+echo
+w_origin=$(printf '%s\n' "${write_pf}" | awk 'BEGIN{IGNORECASE=1} /^access-control-allow-origin:/ {sub(/\r$/,""); sub(/^[^:]+: */,""); print; exit}')
+w_methods=$(printf '%s\n' "${write_pf}" | awk 'BEGIN{IGNORECASE=1} /^access-control-allow-methods:/ {sub(/\r$/,""); sub(/^[^:]+: */,""); print; exit}')
+echo "==> Verdict (WRITE preflight)"
+echo "    Access-Control-Allow-Origin:  ${w_origin:-<missing>}"
+echo "    Access-Control-Allow-Methods: ${w_methods:-<missing>}"
+if [[ -z "${w_origin}" ]]; then
+  echo "    --> WRITES CORS-BLOCKED. Build the server-proxy route for incident submit (PLAN §4A/§5)."
+elif printf '%s' "${w_methods}" | grep -qiE 'post|\*' || [[ "${w_methods}" == "" && ( "${w_origin}" == "*" || "${w_origin}" == "${ORIGIN}" ) ]]; then
+  echo "    --> WRITE CORS looks OK from ${ORIGIN}. Client-side incident submit is viable."
+else
+  echo "    --> Allow-Methods '${w_methods}' does not list POST. Treat writes as blocked → server proxy."
+fi
+echo "        (Confirm in a real browser with browser-test.html's WRITE button — the authoritative check.)"
+echo
+
 echo "==> 2) Real GET with Bearer token — confirms auth + captures response envelope"
 echo
 tmp=$(mktemp)

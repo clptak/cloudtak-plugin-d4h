@@ -59,7 +59,17 @@
     <input id="token" type="password" autocomplete="off" placeholder="Bearer token (paste, not stored)" />
   </label>
 
-  <button id="run">Run</button>
+  <button id="run">Test GET (read)</button>
+  <button id="runWrite">Test WRITE CORS (POST reference/peek — no data created)</button>
+
+  <p style="margin-top:1rem; font-size:13px; color:#555;">
+    <strong>Why the write button matters:</strong> a JSON <code>POST</code> triggers a CORS
+    <em>preflight</em> (OPTIONS) that a plain <code>GET</code> does not. D4H allowing GET tells us
+    nothing about whether it allows writes. <code>/incidents/reference/peek</code> is a
+    <code>POST</code> that only <em>reads</em> the next available reference — it creates nothing —
+    so it exercises the exact same CORS path as a real incident submit, safely. The write probe
+    forces <code>team</code> context regardless of the dropdown (peek is team-scoped).
+  </p>
 
   <h2>Result</h2>
   <p id="verdict">—</p>
@@ -68,45 +78,84 @@
 <script>
   document.getElementById('origin').textContent = location.origin;
 
-  document.getElementById('run').addEventListener('click', async () => {
-    const region    = document.getElementById('region').value;
-    const context   = document.getElementById('context').value;
-    const contextId = document.getElementById('contextId').value.trim();
-    const token     = document.getElementById('token').value.trim();
-    const verdict   = document.getElementById('verdict');
-    const out       = document.getElementById('out');
+  function inputs() {
+    return {
+      region:    document.getElementById('region').value,
+      context:   document.getElementById('context').value,
+      contextId: document.getElementById('contextId').value.trim(),
+      token:     document.getElementById('token').value.trim(),
+      verdict:   document.getElementById('verdict'),
+      out:       document.getElementById('out'),
+    };
+  }
 
+  // ── GET probe (read CORS) ──────────────────────────────────────────────────
+  document.getElementById('run').addEventListener('click', async () => {
+    const { region, context, contextId, token, verdict, out } = inputs();
     if (!contextId || !token) {
       verdict.innerHTML = '<span class="bad">Need contextId and token.</span>';
       return;
     }
 
     const url = `https://api.team-manager.${region}.d4h.com/v3/${context}/${contextId}/members`;
-    verdict.textContent = 'Calling ' + url + ' …';
+    verdict.textContent = 'GET ' + url + ' …';
     out.textContent = '';
 
     try {
       const res = await fetch(url, {
         method: 'GET',
-        headers: {
-          'Authorization': 'Bearer ' + token,
-          'Accept': 'application/json',
-        },
+        headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json' },
       });
       const text = await res.text();
-      let body;
-      try { body = JSON.parse(text); } catch { body = text; }
+      let body; try { body = JSON.parse(text); } catch { body = text; }
 
       if (res.ok) {
-        verdict.innerHTML = `<span class="ok">OK — HTTP ${res.status}.</span> Browser allowed the response. Client-side-direct works from <code>${location.origin}</code>.`;
+        verdict.innerHTML = `<span class="ok">GET OK — HTTP ${res.status}.</span> Browser allowed the response. Reads work client-side from <code>${location.origin}</code>.`;
       } else {
         verdict.innerHTML = `<span class="bad">HTTP ${res.status}.</span> Auth or path issue — not a CORS failure (the response came through).`;
       }
-      out.textContent = typeof body === 'string'
-        ? body.slice(0, 4000)
-        : JSON.stringify(body, null, 2).slice(0, 4000);
+      out.textContent = typeof body === 'string' ? body.slice(0, 4000) : JSON.stringify(body, null, 2).slice(0, 4000);
     } catch (e) {
-      verdict.innerHTML = `<span class="bad">Fetch failed (likely CORS).</span> Check the devtools Network tab — if the preflight (OPTIONS) is missing <code>Access-Control-Allow-Origin</code> for <code>${location.origin}</code>, D4H is blocking this origin. Fall back to the server-proxy route (plan §3).`;
+      verdict.innerHTML = `<span class="bad">GET fetch failed (likely CORS).</span> Check the devtools Network tab for a missing <code>Access-Control-Allow-Origin</code> on this origin.`;
+      out.textContent = String(e);
+    }
+  });
+
+  // ── WRITE probe (write CORS, side-effect-free) ─────────────────────────────
+  // POST /v3/team/{id}/incidents/reference/peek with a JSON body forces the same
+  // preflight a real incident submit would. peek only *reads* the next reference.
+  document.getElementById('runWrite').addEventListener('click', async () => {
+    const { region, contextId, token, verdict, out } = inputs();
+    if (!contextId || !token) {
+      verdict.innerHTML = '<span class="bad">Need contextId and token.</span>';
+      return;
+    }
+
+    const url = `https://api.team-manager.${region}.d4h.com/v3/team/${contextId}/incidents/reference/peek`;
+    verdict.textContent = 'POST ' + url + ' … (no incident is created)';
+    out.textContent = '';
+
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer ' + token,
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',   // ← this is what triggers the preflight
+        },
+        body: '{}',
+      });
+      const text = await res.text();
+      let body; try { body = JSON.parse(text); } catch { body = text; }
+
+      if (res.ok) {
+        verdict.innerHTML = `<span class="ok">WRITE CORS OK — HTTP ${res.status}.</span> The preflight passed and the POST went through. <strong>Client-side incident submit is viable</strong> from <code>${location.origin}</code>.`;
+      } else {
+        verdict.innerHTML = `<span class="bad">HTTP ${res.status}.</span> The response came through (so CORS is <em>not</em> the blocker) — this is an auth/scope/auto-id issue. A ${res.status} here often means the token lacks write scope or the team has auto-id disabled.`;
+      }
+      out.textContent = typeof body === 'string' ? body.slice(0, 4000) : JSON.stringify(body, null, 2).slice(0, 4000);
+    } catch (e) {
+      verdict.innerHTML = `<span class="bad">WRITE preflight failed (CORS blocks writes).</span> Reads may still work, but the browser will not POST to D4H from <code>${location.origin}</code>. <strong>Build the CloudTAK server-proxy route</strong> (PLAN §4A/§5) and route the incident submit through it.`;
       out.textContent = String(e);
     }
   });

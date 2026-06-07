@@ -66,7 +66,39 @@
             </div>
 
             <div class='mt-2'>
-                <label class='form-label small fw-semibold'>D4H access token</label>
+                <div class='d-flex align-items-center gap-1 mb-1'>
+                    <label class='form-label small fw-semibold mb-0'>D4H Personal Access Token</label>
+                    <div
+                        ref='tokenHelpRef'
+                        class='position-relative d-inline-flex'
+                    >
+                        <button
+                            type='button'
+                            class='btn btn-link btn-sm p-0 text-muted lh-1 border-0'
+                            aria-label='How to obtain a D4H Personal Access Token'
+                            @click.stop='tokenHelpOpen = !tokenHelpOpen'
+                        >
+                            <IconInfoCircle
+                                :size='16'
+                                stroke='1.5'
+                            />
+                        </button>
+                        <div
+                            v-if='tokenHelpOpen'
+                            class='position-absolute start-0 mt-1 p-2 bg-body border rounded shadow-sm small'
+                            style='z-index:1050; min-width:16rem; top:100%;'
+                            @click.stop
+                        >
+                            <a
+                                href='https://api.team-manager.us.d4h.com/v3/docs#section/Introduction/Getting-Authenticated'
+                                target='_blank'
+                                rel='noopener noreferrer'
+                            >
+                                See D4H Instructions for Obtaining Personal Access Tokens
+                            </a>
+                        </div>
+                    </div>
+                </div>
                 <input
                     v-model='form.token'
                     type='password'
@@ -133,7 +165,8 @@
 </template>
 
 <script setup lang='ts'>
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, onUnmounted, reactive, ref } from 'vue';
+import { IconInfoCircle } from '@tabler/icons-vue';
 import {
     loadConfig, saveConfig, clearConfig, regionBaseUrl,
     type D4HConfig, type D4HRegion, type D4HContext,
@@ -158,10 +191,20 @@ const form = reactive<FormState>({
     token:     '',
 });
 
-const saving   = ref(false);
-const testing  = ref(false);
-const hasSaved = ref(false);
-const status   = ref<{ kind: 'ok' | 'err' | 'info'; title: string; detail?: string } | null>(null);
+const saving         = ref(false);
+const testing        = ref(false);
+const hasSaved       = ref(false);
+const status         = ref<{ kind: 'ok' | 'err' | 'info'; title: string; detail?: string } | null>(null);
+const tokenHelpOpen  = ref(false);
+const tokenHelpRef   = ref<HTMLElement | null>(null);
+
+function onDocumentClick(event: MouseEvent): void {
+    if (!tokenHelpOpen.value) return;
+    const el = tokenHelpRef.value;
+    if (el && !el.contains(event.target as Node)) {
+        tokenHelpOpen.value = false;
+    }
+}
 
 const regionDefaultUrl = computed(() => regionBaseUrl(form.region));
 const canSubmit = computed(() =>
@@ -174,6 +217,7 @@ const statusClass = computed(() => ({
 }));
 
 onMounted(async () => {
+    document.addEventListener('click', onDocumentClick);
     const existing = await loadConfig();
     if (existing) {
         form.region    = existing.region;
@@ -183,6 +227,10 @@ onMounted(async () => {
         form.token     = existing.token;
         hasSaved.value = true;
     }
+});
+
+onUnmounted(() => {
+    document.removeEventListener('click', onDocumentClick);
 });
 
 function buildConfig(): D4HConfig | null {
