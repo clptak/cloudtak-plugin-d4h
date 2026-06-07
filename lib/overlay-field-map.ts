@@ -52,7 +52,7 @@ export const OVERLAY_FIELD_MAP: OverlayFieldMapping[] = [
     // { customFieldId: 1003, overlayLayerId: '63-fill', attribute: 'WILDERNESS',    note: 'Wilderness Incursion' },
     {
         customFieldId: 8032, // TODO: replace with the real D4H "Land Management" field id (#id shown in the tab)
-        overlayLayerId: '136-poly',
+        overlayLayerId: 'ranger-poly',
         attribute: 'districtorgcode',
         note: 'Land Management District',
         valueMap: {
