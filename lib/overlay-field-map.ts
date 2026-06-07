@@ -53,19 +53,19 @@ export const OVERLAY_FIELD_MAP: OverlayFieldMapping[] = [
     {
         customFieldId: 8032, // TODO: replace with the real D4H "Land Management" field id (#id shown in the tab)
         overlayLayerId: '136-poly',
-        attribute: 'districtname',
+        attribute: 'districtorgcode',
         note: 'Land Management District',
         valueMap: {
             // overlay value (districtname)        : D4H option label (must match exactly after normalize)
-            'Red Rock Ranger District': 'USFS COCONINO-RED ROCK RANGER DISTRICT',
-            'Williams Ranger District': 'USFS KAIBAB-WILLIAMS RANGER DISTRICT',
-            'Tusayan Ranger District': 'USFS KAIBAB-TUSAYAN RANGER DISTRICT',
-            'North Kaibab Ranger District': 'USFS KAIBAB-NORTH KAIBAB RANGER DISTRICT',
-            'Flagstaff Ranger District': 'USFS COCONINO-FLAGSTAFF RANGER DISTRICT',
-            'Mogollon Rim Ranger District': 'USFS COCONINO-MOGOLLON RIM RANGER DISTRICT',
-            'Black Mesa Ranger District': 'USFS A-S - BLACK MESA RANGER DISTRICT',
-            'Verde Ranger District': 'USFS PRESCOTT - VERDE RANGER DISTRICT',
-            'Chino Valley Ranger District': 'USFS PRESCOTT - CHINO VALLEY RANGER DISTRICT',
+            '030406': 'USFS COCONINO-RED ROCK RANGER DISTRICT',
+            '030701': 'USFS KAIBAB-WILLIAMS RANGER DISTRICT',
+            '030704': 'USFS KAIBAB-TUSAYAN RANGER DISTRICT',
+            '030703': 'USFS KAIBAB-NORTH KAIBAB RANGER DISTRICT',
+            '030408': 'USFS COCONINO-FLAGSTAFF RANGER DISTRICT',
+            '030407': 'USFS COCONINO-MOGOLLON RIM RANGER DISTRICT',
+            '030102': 'USFS A-S - BLACK MESA RANGER DISTRICT',
+            '030905': 'USFS PRESCOTT - VERDE RANGER DISTRICT',
+            '030901': 'USFS PRESCOTT - CHINO VALLEY RANGER DISTRICT',
             // add the rest of your districts here, e.g.:
             // 'Mogollon Rim Ranger District': 'USFS COCONINO-MOGOLLON RIM RANGER DISTRICT',
         },
