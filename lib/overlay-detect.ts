@@ -42,7 +42,8 @@ export interface InspectResult {
     layerId:     string;
     /** Stable id with the volatile overlay-id prefix stripped, e.g. "136-poly". USE THIS in the map. */
     stableLayerId: string;
-    overlayName: string;
+    /** Overlay source id (the volatile leading number), for reference only. */
+    source:      string;
     properties:  Record<string, unknown>;
 }
 
@@ -82,37 +83,28 @@ function visibleOverlays(overlays: OverlayLike[]): OverlayLike[] {
     return overlays.filter((o) => o.visible !== false);
 }
 
-/** Which overlay (if any) a rendered feature belongs to — by source id or layer-id prefix. */
-function overlayForFeature(f: RenderedFeature, overlays: OverlayLike[]): OverlayLike | undefined {
-    for (const o of overlays) {
-        const sid = String(o.id);
-        if (f.source === sid) return o;
-        if (f.layer.id === sid || f.layer.id.startsWith(`${sid}-`)) return o;
-    }
-    return undefined;
-}
-
-/** Dump every overlay feature under the point — used to author the mapping. */
+/**
+ * Dump every rendered OVERLAY feature under the point — used to author the mapping.
+ * Does NOT depend on the map store's overlays list (which can come back empty inside a plugin);
+ * it simply keeps any rendered layer whose id has the `${overlayId}-…` shape.
+ */
 export function inspectAtPoint(
     map: MapLike,
-    overlays: OverlayLike[],
     lonLat: [number, number],
 ): InspectResult[] {
-    const vis = visibleOverlays(overlays);
     const feats = map.queryRenderedFeatures(boxAround(map, lonLat));
 
     const out: InspectResult[] = [];
     const seen = new Set<string>();
     for (const f of feats) {
-        const ov = overlayForFeature(f, vis);
-        if (!ov) continue;
-        const key = `${f.layer.id}|${JSON.stringify(f.properties ?? {})}`;
+        if (!/^\d+-/.test(f.layer.id)) continue; // overlay layers only (skip basemap)
+        const key = `${layerSuffix(f.layer.id)}|${JSON.stringify(f.properties ?? {})}`;
         if (seen.has(key)) continue;
         seen.add(key);
         out.push({
             layerId:       f.layer.id,
             stableLayerId: layerSuffix(f.layer.id),
-            overlayName:   ov.name,
+            source:        f.source ?? '',
             properties:    (f.properties ?? {}) as Record<string, unknown>,
         });
     }
@@ -145,7 +137,6 @@ export function debugAtPoint(
 /** Apply the static mapping at the point: read each mapped attribute from its overlay layer. */
 export function detectValues(
     map: MapLike,
-    overlays: OverlayLike[],
     lonLat: [number, number],
     mapping: OverlayFieldMapping[],
 ): DetectResult[] {

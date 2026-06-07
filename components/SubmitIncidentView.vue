@@ -146,7 +146,7 @@
                         class='mb-2'
                     >
                         <div class='fw-semibold'>
-                            {{ r.overlayName }}
+                            <span class='text-muted me-1'>overlayLayerId:</span>
                             <code
                                 class='text-success'
                                 title='Use THIS in overlay-field-map.ts (stable across restarts)'
@@ -623,10 +623,9 @@ async function onInspect(): Promise<void> {
     const lonLat: [number, number] = [selectedPoint.value.lon, selectedPoint.value.lat];
     const map = await recenterTo(lonLat);
     if (!map) return;
-    const overlays = overlaysFromStore();
-    inspectResults.value = inspectAtPoint(map, overlays, lonLat);
-    // If nothing matched, capture what IS rendered there to diagnose source/layer mismatches.
-    inspectDebug.value = inspectResults.value.length ? null : debugAtPoint(map, overlays, lonLat);
+    inspectResults.value = inspectAtPoint(map, lonLat);
+    // If nothing matched, capture what IS rendered there to diagnose.
+    inspectDebug.value = inspectResults.value.length ? null : debugAtPoint(map, overlaysFromStore(), lonLat);
 }
 
 async function onDetect(): Promise<void> {
@@ -638,7 +637,7 @@ async function onDetect(): Promise<void> {
         const lonLat: [number, number] = [selectedPoint.value.lon, selectedPoint.value.lat];
         const map = await recenterTo(lonLat);
         if (!map) return;
-        applyDetected(detectValues(map, overlaysFromStore(), lonLat, OVERLAY_FIELD_MAP));
+        applyDetected(detectValues(map, lonLat, OVERLAY_FIELD_MAP));
     } finally {
         detecting.value = false;
     }

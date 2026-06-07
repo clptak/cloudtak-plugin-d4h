@@ -101,21 +101,52 @@ export const OVERLAY_FIELD_MAP: OverlayFieldMapping[] = [
     },
     {
         customFieldId: 8033, // TODO: replace with the real D4H "Wilderness" field id (#id shown in the tab)
-        overlayLayerId: 'bos-poly',
+        overlayLayerId: '38-polyline1',
+        attribute: 'OBJECTID',
+        note: 'Supervisor District',
+        valueMap: {
+            '1': 'DISTRICT 1',
+        },
+    },
+    {
+        customFieldId: 8033, // TODO: replace with the real D4H "Wilderness" field id (#id shown in the tab)
+        overlayLayerId: '38-polyline2',
+        attribute: 'OBJECTID',
+        note: 'Supervisor District',
+        valueMap: {
+            '2': 'DISTRICT 2',
+        },
+    },
+    {
+        customFieldId: 8033, // TODO: replace with the real D4H "Wilderness" field id (#id shown in the tab)
+        overlayLayerId: '38-polyline3',
+        attribute: 'OBJECTID',
+        note: 'Supervisor District',
+        valueMap: {
+            '3': 'DISTRICT 3',
+        },
+    },
+    {
+        customFieldId: 8033, // TODO: replace with the real D4H "Wilderness" field id (#id shown in the tab)
+        overlayLayerId: '38-polyline4',
+        attribute: 'OBJECTID',
+        note: 'Supervisor District',
+        valueMap: {
+            '4': 'DISTRICT 4',        },
+    },
+    {
+        customFieldId: 8033, // TODO: replace with the real D4H "Wilderness" field id (#id shown in the tab)
+        overlayLayerId: '38-polyline5',
         attribute: 'OBJECTID',
         note: 'Supervisor District',
         valueMap: {
             // overlay value (OBJECTID)        : D4H option label (must match exactly after normalize)
-            '1': 'DISTRICT 1',
-            '2': 'DISTRICT 2',
-            '3': 'DISTRICT 3',
-            '4': 'DISTRICT 4',
             '5': 'DISTRICT 5',
         },
     },
     {
         customFieldId: 1483, // TODO: replace with the real D4H "Wilderness" field id (#id shown in the tab)
-        overlayLayerId: 'wilderness-poly',
+        overlayLayerId: 'Wilderness-poly',
         attribute: 'NAME',
         note: 'Wilderness Name',
     },
