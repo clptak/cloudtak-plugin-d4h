@@ -147,7 +147,15 @@
                     >
                         <div class='fw-semibold'>
                             {{ r.overlayName }}
-                            <code class='text-muted'>{{ r.layerId }}</code>
+                            <code
+                                class='text-success'
+                                title='Use THIS in overlay-field-map.ts (stable across restarts)'
+                            >{{ r.stableLayerId }}</code>
+                            <code
+                                class='text-muted ms-1'
+                                style='font-size:0.7rem'
+                                title='full runtime id — leading number changes on restart'
+                            >({{ r.layerId }})</code>
                         </div>
                         <div
                             v-for='(val, key) in r.properties'

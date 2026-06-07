@@ -38,9 +38,21 @@ export interface OverlayLike {
 }
 
 export interface InspectResult {
+    /** Full runtime layer id, e.g. "1202-136-poly" (the leading number changes on restart). */
     layerId:     string;
+    /** Stable id with the volatile overlay-id prefix stripped, e.g. "136-poly". USE THIS in the map. */
+    stableLayerId: string;
     overlayName: string;
     properties:  Record<string, unknown>;
+}
+
+/**
+ * Strip the volatile leading overlay-id prefix from a layer id.
+ * CloudTAK builds layer ids as `${overlay.id}-${originalLayerId}`, and `overlay.id` is reassigned on
+ * restart — so "1202-136-poly" and "1530-136-poly" are the same layer. We match on "136-poly".
+ */
+export function layerSuffix(id: string): string {
+    return id.replace(/^\d+-/, '');
 }
 
 export interface DetectResult {
@@ -98,9 +110,10 @@ export function inspectAtPoint(
         if (seen.has(key)) continue;
         seen.add(key);
         out.push({
-            layerId:     f.layer.id,
-            overlayName: ov.name,
-            properties:  (f.properties ?? {}) as Record<string, unknown>,
+            layerId:       f.layer.id,
+            stableLayerId: layerSuffix(f.layer.id),
+            overlayName:   ov.name,
+            properties:    (f.properties ?? {}) as Record<string, unknown>,
         });
     }
     return out;
@@ -139,14 +152,17 @@ export function detectValues(
     if (!mapping.length) return [];
     const feats = map.queryRenderedFeatures(boxAround(map, lonLat));
 
-    // First feature per layer id wins (one area feature per overlay at a point).
-    const byLayer = new Map<string, Record<string, unknown>>();
+    // Key by the STABLE layer suffix so matches survive restarts (the leading overlay-id changes).
+    // First feature per suffix wins (one area feature per overlay at a point).
+    const bySuffix = new Map<string, Record<string, unknown>>();
     for (const f of feats) {
-        if (!byLayer.has(f.layer.id)) byLayer.set(f.layer.id, (f.properties ?? {}) as Record<string, unknown>);
+        const suf = layerSuffix(f.layer.id);
+        if (!bySuffix.has(suf)) bySuffix.set(suf, (f.properties ?? {}) as Record<string, unknown>);
     }
 
     return mapping.map((m) => {
-        const props = byLayer.get(m.overlayLayerId);
+        // Accept either a full id ("1202-136-poly") or just the stable part ("136-poly") in the map file.
+        const props = bySuffix.get(layerSuffix(m.overlayLayerId));
         const raw = props ? props[m.attribute] : undefined;
         const rawStr = raw == null || raw === '' ? null : String(raw);
         const value = rawStr == null ? null : translateValue(rawStr, m.valueMap);

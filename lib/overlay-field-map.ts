@@ -26,7 +26,11 @@
 export interface OverlayFieldMapping {
     /** D4H incident custom-field id to fill. */
     customFieldId: number;
-    /** Maplibre layer id of the clickable overlay (from "Inspect overlays at point"), e.g. "57-fill". */
+    /**
+     * Overlay layer id (from "Inspect overlays at point"). Use the STABLE part shown in green, e.g.
+     * "136-poly" — the leading number ("1202-") is the overlay's runtime id and CHANGES on restart.
+     * A full id like "1202-136-poly" also works; the leading numeric prefix is ignored when matching.
+     */
     overlayLayerId: string;
     /** Property key on that overlay's features whose value to use, e.g. "DISTRICT_NAME". */
     attribute: string;
@@ -48,7 +52,7 @@ export const OVERLAY_FIELD_MAP: OverlayFieldMapping[] = [
     // { customFieldId: 1003, overlayLayerId: '63-fill', attribute: 'WILDERNESS',    note: 'Wilderness Incursion' },
     {
         customFieldId: 8032, // TODO: replace with the real D4H "Land Management" field id (#id shown in the tab)
-        overlayLayerId: '1222-136-poly',
+        overlayLayerId: '136-poly',
         attribute: 'districtname',
         note: 'Land Management District',
         valueMap: {
@@ -68,7 +72,7 @@ export const OVERLAY_FIELD_MAP: OverlayFieldMapping[] = [
     },
     {
         customFieldId: 1485,
-        overlayLayerId: '1219-landowner-poly',
+        overlayLayerId: 'landowner-poly',
         attribute: 'OWNERORMANAGINGAGENCY',
         note: 'Land Owner or Managing Agency',
         valueMap: {
@@ -97,7 +101,7 @@ export const OVERLAY_FIELD_MAP: OverlayFieldMapping[] = [
     },
     {
         customFieldId: 8033, // TODO: replace with the real D4H "Wilderness" field id (#id shown in the tab)
-        overlayLayerId: '1221-bos-poly',
+        overlayLayerId: 'bos-poly',
         attribute: 'OBJECTID',
         note: 'Supervisor District',
         valueMap: {
@@ -111,7 +115,7 @@ export const OVERLAY_FIELD_MAP: OverlayFieldMapping[] = [
     },
     {
         customFieldId: 1483, // TODO: replace with the real D4H "Wilderness" field id (#id shown in the tab)
-        overlayLayerId: '1220-wilderness-poly',
+        overlayLayerId: 'wilderness-poly',
         attribute: 'NAME',
         note: 'Wilderness Name',
     },

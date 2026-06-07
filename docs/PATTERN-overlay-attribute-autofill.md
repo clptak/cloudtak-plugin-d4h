@@ -23,6 +23,9 @@ their `properties`. This is the same call CloudTAK's own map-click handler uses.
 - **Match overlay features by SOURCE, not the overlay's `_clickable` list.** `_clickable` is often empty,
   or only the outline/label layer, so an interior point matches nothing. CloudTAK sets each overlay
   layer's `source` to `String(overlay.id)` — filter on that (or a `${id}-` layer-id prefix).
+- **The leading number in a layer id changes on restart.** Layer ids are `${overlay.id}-${original}`
+  and `overlay.id` is reassigned each restart, so `1202-136-poly` becomes `1530-136-poly`. Match on the
+  STABLE suffix (`136-poly`) by stripping a leading `^\d+-`, never the full id.
 - **Query a small pixel box, not a single pixel** — tolerates thin geometries and exact-pixel misses.
 - **Recenter the map on the point first and wait for `idle`** — `queryRenderedFeatures` only sees tiles
   rendered in the current viewport, so an off-screen point returns nothing until its tiles load.
@@ -77,7 +80,8 @@ export interface OverlayLike {
 }
 
 export interface InspectResult {
-    layerId: string;
+    layerId: string;        // full runtime id, e.g. "1202-136-poly" (leading number changes on restart)
+    stableLayerId: string;  // use THIS in your config, e.g. "136-poly"
     overlayName: string;
     properties: Record<string, unknown>;
 }
@@ -95,6 +99,11 @@ function boxAround(map: MapLike, lonLat: [number, number]): PixelBox {
     return [[p.x - BOX_HALF, p.y - BOX_HALF], [p.x + BOX_HALF, p.y + BOX_HALF]];
 }
 
+/** Strip the volatile leading overlay-id prefix: "1202-136-poly" -> "136-poly". */
+export function layerSuffix(id: string): string {
+    return id.replace(/^\d+-/, '');
+}
+
 function visibleOverlays(overlays: OverlayLike[]): OverlayLike[] {
     return overlays.filter((o) => o.visible !== false);
 }
@@ -109,8 +118,9 @@ function overlayForFeature(f: RenderedFeature, overlays: OverlayLike[]): Overlay
 }
 
 /**
- * Read a single attribute from a specific overlay layer at the point.
- * Returns the value as a string, or null if nothing is there.
+ * Read a single attribute from an overlay layer at the point.
+ * Pass the STABLE layer id ("136-poly") or a full one ("1202-136-poly") — the leading overlay-id
+ * prefix is ignored, so this keeps working after restarts. Returns the value, or null if nothing's there.
  */
 export function readAttributeAtPoint(
     map: MapLike,
@@ -118,9 +128,10 @@ export function readAttributeAtPoint(
     layerId: string,
     attribute: string,
 ): string | null {
-    const feats = map.queryRenderedFeatures(boxAround(map, lonLat), { layers: [layerId] });
+    const wantSuffix = layerSuffix(layerId);
+    const feats = map.queryRenderedFeatures(boxAround(map, lonLat));
     for (const f of feats) {
-        if (f.layer.id !== layerId) continue;
+        if (layerSuffix(f.layer.id) !== wantSuffix) continue;
         const raw = (f.properties ?? {})[attribute];
         if (raw != null && raw !== '') return String(raw);
     }
@@ -143,7 +154,7 @@ export function inspectAtPoint(
         const key = `${f.layer.id}|${JSON.stringify(f.properties ?? {})}`;
         if (seen.has(key)) continue;
         seen.add(key);
-        out.push({ layerId: f.layer.id, overlayName: ov.name, properties: (f.properties ?? {}) as Record<string, unknown> });
+        out.push({ layerId: f.layer.id, stableLayerId: layerSuffix(f.layer.id), overlayName: ov.name, properties: (f.properties ?? {}) as Record<string, unknown> });
     }
     return out;
 }
@@ -224,7 +235,7 @@ async function autofill(): Promise<void> {
     const lonLat = pointLonLat();
     const map = await recenterTo(lonLat);
     if (!map) return;
-    const value = readAttributeAtPoint(map, lonLat, '1202-136-poly', 'districtname');
+    const value = readAttributeAtPoint(map, lonLat, '136-poly', 'districtname'); // stable id (no leading overlay number)
     if (value != null) myField.value = value;
 }
 
