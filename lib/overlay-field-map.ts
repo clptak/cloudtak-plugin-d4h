@@ -48,7 +48,7 @@ export const OVERLAY_FIELD_MAP: OverlayFieldMapping[] = [
     // { customFieldId: 1003, overlayLayerId: '63-fill', attribute: 'WILDERNESS',    note: 'Wilderness Incursion' },
     {
         customFieldId: 8032, // TODO: replace with the real D4H "Land Management" field id (#id shown in the tab)
-        overlayLayerId: '1202-136-poly',
+        overlayLayerId: '1222-136-poly',
         attribute: 'districtname',
         note: 'Land Management District',
         valueMap: {
@@ -68,7 +68,7 @@ export const OVERLAY_FIELD_MAP: OverlayFieldMapping[] = [
     },
     {
         customFieldId: 1485,
-        overlayLayerId: '1212-landowner-poly',
+        overlayLayerId: '1219-landowner-poly',
         attribute: 'OWNERORMANAGINGAGENCY',
         note: 'Land Owner or Managing Agency',
         valueMap: {
@@ -97,7 +97,7 @@ export const OVERLAY_FIELD_MAP: OverlayFieldMapping[] = [
     },
     {
         customFieldId: 8033, // TODO: replace with the real D4H "Wilderness" field id (#id shown in the tab)
-        overlayLayerId: '1209-bos-poly',
+        overlayLayerId: '1221-bos-poly',
         attribute: 'OBJECTID',
         note: 'Supervisor District',
         valueMap: {
@@ -111,7 +111,7 @@ export const OVERLAY_FIELD_MAP: OverlayFieldMapping[] = [
     },
     {
         customFieldId: 1483, // TODO: replace with the real D4H "Wilderness" field id (#id shown in the tab)
-        overlayLayerId: '1208-wilderness-poly',
+        overlayLayerId: '1220-wilderness-poly',
         attribute: 'NAME',
         note: 'Wilderness Name',
     },
