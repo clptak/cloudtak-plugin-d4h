@@ -1,22 +1,32 @@
 // Query ArcGIS/GeoJSON overlay attributes at a point, for the Submit Incident tab.
 //
-// Mechanism (mirrors CloudTAK's own map click handler in stores/map.ts): project the point's
-// lon/lat to a screen pixel, then map.queryRenderedFeatures(pixel, { layers }) restricted to the
-// overlays' clickable layer ids. Only works for overlays that are toggled ON and rendered at the
-// point — vector/geojson overlays carry attributes; raster (MapServer image) overlays do not.
+// Mechanism: project the point's lon/lat to a screen pixel, query a small box around it with
+// map.queryRenderedFeatures(box), then keep features that belong to one of the user's overlays.
+// "Belongs to an overlay" is decided by the feature's SOURCE id (CloudTAK sets each overlay layer's
+// source to String(overlay.id)) or a layer-id prefix `${overlay.id}-`. This deliberately does NOT
+// depend on the overlay's `_clickable` list (often empty, or only the outline/label layer), which is
+// why an interior point previously matched nothing.
+//
+// Only vector/geojson overlays that are toggled ON carry attributes; raster (MapServer image)
+// overlays return nothing here.
 
 import type { OverlayFieldMapping } from './overlay-field-map.ts';
 
-// Minimal structural types so this module doesn't hard-depend on maplibre-gl / the core Overlay class.
+type PixelBox = [[number, number], [number, number]];
+
+interface RenderedFeature {
+    layer: { id: string };
+    source?: string;
+    properties: Record<string, unknown> | null;
+}
+
+// Minimal structural map type so this module doesn't hard-depend on maplibre-gl.
 export interface MapLike {
     project(lnglat: [number, number]): { x: number; y: number };
     queryRenderedFeatures(
-        geometry?: { x: number; y: number },
+        geometry?: { x: number; y: number } | PixelBox,
         options?: { layers?: string[] },
-    ): Array<{
-        layer: { id: string };
-        properties: Record<string, unknown> | null;
-    }>;
+    ): RenderedFeature[];
 }
 
 export interface OverlayLike {
@@ -41,43 +51,82 @@ export interface DetectResult {
     value:          string | null;
 }
 
-/** Clickable layer ids across overlays (optionally only those toggled on), with their overlay name. */
-export function clickableLayers(
-    overlays: OverlayLike[],
-    onlyVisible = true,
-): Array<{ layerId: string; overlayName: string }> {
-    const out: Array<{ layerId: string; overlayName: string }> = [];
-    for (const ov of overlays) {
-        if (onlyVisible && ov.visible === false) continue;
-        for (const c of ov._clickable ?? []) {
-            out.push({ layerId: c.id, overlayName: ov.name });
-        }
-    }
-    return out;
+/** Diagnostics for when nothing matches — surfaced in the UI to debug mappings. */
+export interface DetectDebug {
+    totalFeaturesAtPoint: number;
+    /** layer id + source for every rendered feature under the point (deduped, capped). */
+    sampleLayers:         Array<{ layerId: string; source: string }>;
+    visibleOverlays:      Array<{ id: number; name: string; type?: string }>;
 }
 
-/** Dump every clickable overlay feature under the point — used to author the mapping. */
+const BOX_HALF = 4; // pixels — tolerates thin geometries / exact-pixel misses
+
+function boxAround(map: MapLike, lonLat: [number, number]): PixelBox {
+    const p = map.project(lonLat);
+    return [[p.x - BOX_HALF, p.y - BOX_HALF], [p.x + BOX_HALF, p.y + BOX_HALF]];
+}
+
+function visibleOverlays(overlays: OverlayLike[]): OverlayLike[] {
+    return overlays.filter((o) => o.visible !== false);
+}
+
+/** Which overlay (if any) a rendered feature belongs to — by source id or layer-id prefix. */
+function overlayForFeature(f: RenderedFeature, overlays: OverlayLike[]): OverlayLike | undefined {
+    for (const o of overlays) {
+        const sid = String(o.id);
+        if (f.source === sid) return o;
+        if (f.layer.id === sid || f.layer.id.startsWith(`${sid}-`)) return o;
+    }
+    return undefined;
+}
+
+/** Dump every overlay feature under the point — used to author the mapping. */
 export function inspectAtPoint(
     map: MapLike,
     overlays: OverlayLike[],
     lonLat: [number, number],
 ): InspectResult[] {
-    const layers = clickableLayers(overlays, true);
-    if (!layers.length) return [];
-    const byLayer = new Map(layers.map((l) => [l.layerId, l.overlayName]));
-
-    const pixel = map.project(lonLat);
-    const feats = map.queryRenderedFeatures(pixel, { layers: layers.map((l) => l.layerId) });
+    const vis = visibleOverlays(overlays);
+    const feats = map.queryRenderedFeatures(boxAround(map, lonLat));
 
     const out: InspectResult[] = [];
+    const seen = new Set<string>();
     for (const f of feats) {
+        const ov = overlayForFeature(f, vis);
+        if (!ov) continue;
+        const key = `${f.layer.id}|${JSON.stringify(f.properties ?? {})}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
         out.push({
             layerId:     f.layer.id,
-            overlayName: byLayer.get(f.layer.id) ?? f.layer.id,
+            overlayName: ov.name,
             properties:  (f.properties ?? {}) as Record<string, unknown>,
         });
     }
     return out;
+}
+
+/** Diagnostics: what's actually rendered under the point, regardless of overlay membership. */
+export function debugAtPoint(
+    map: MapLike,
+    overlays: OverlayLike[],
+    lonLat: [number, number],
+): DetectDebug {
+    const feats = map.queryRenderedFeatures(boxAround(map, lonLat));
+    const seen = new Set<string>();
+    const sampleLayers: Array<{ layerId: string; source: string }> = [];
+    for (const f of feats) {
+        const k = `${f.layer.id}|${f.source ?? ''}`;
+        if (seen.has(k)) continue;
+        seen.add(k);
+        sampleLayers.push({ layerId: f.layer.id, source: f.source ?? '' });
+        if (sampleLayers.length >= 40) break;
+    }
+    return {
+        totalFeaturesAtPoint: feats.length,
+        sampleLayers,
+        visibleOverlays: visibleOverlays(overlays).map((o) => ({ id: o.id, name: o.name, type: o.type })),
+    };
 }
 
 /** Apply the static mapping at the point: read each mapped attribute from its overlay layer. */
@@ -88,11 +137,9 @@ export function detectValues(
     mapping: OverlayFieldMapping[],
 ): DetectResult[] {
     if (!mapping.length) return [];
-    const wantedLayerIds = Array.from(new Set(mapping.map((m) => m.overlayLayerId)));
-    const pixel = map.project(lonLat);
-    const feats = map.queryRenderedFeatures(pixel, { layers: wantedLayerIds });
+    const feats = map.queryRenderedFeatures(boxAround(map, lonLat));
 
-    // First feature per layer id wins (clickable overlays render one feature per area at a point).
+    // First feature per layer id wins (one area feature per overlay at a point).
     const byLayer = new Map<string, Record<string, unknown>>();
     for (const f of feats) {
         if (!byLayer.has(f.layer.id)) byLayer.set(f.layer.id, (f.properties ?? {}) as Record<string, unknown>);

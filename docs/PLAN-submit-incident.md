@@ -249,6 +249,14 @@ call). Raster overlays would need ArcGIS REST identify — out of scope.
 Constraints to remember: auto-detect only sees overlays **toggled on** and **vector/geojson**; the map
 recenters on detect (button-initiated). Typechecks clean under strict `vue-tsc`.
 
+**Fix (2026-06-06): matching no longer uses `_clickable`.** The first cut queried only each overlay's
+`_clickable` layer ids — often empty, or just the outline/label layer, so an interior point matched
+nothing ("No clickable overlay features"). Now `inspectAtPoint`/`detectValues` query a small pixel box
+and keep features whose **source** is `String(overlay.id)` (or layer id prefixed `${id}-`), independent
+of the clickable flag. Added `debugAtPoint()` + a UI diagnostics panel (rendered-feature count, visible
+overlays, and every layerId←source under the point) shown when nothing matches, and lengthened the
+post-recenter idle wait to 4s so far jumps finish loading tiles before the query.
+
 Next-step ideas: trigger detect automatically on point-select (not just button); raster-overlay support
 via ArcGIS `/query`/`/identify`; an in-app mapping editor if hand-editing the file gets old.
 

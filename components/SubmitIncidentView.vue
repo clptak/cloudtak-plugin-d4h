@@ -108,11 +108,37 @@
                     class='border rounded p-2 mt-1 small'
                     style='max-height:30vh;overflow:auto'
                 >
-                    <div
-                        v-if='!inspectResults.length'
-                        class='text-muted'
-                    >
-                        No clickable overlay features at this point (is the overlay on and a vector layer?).
+                    <div v-if='!inspectResults.length'>
+                        <div class='text-muted mb-1'>
+                            No overlay features matched at this point. Diagnostics below:
+                        </div>
+                        <div
+                            v-if='inspectDebug'
+                            class='font-monospace'
+                            style='font-size:0.75rem'
+                        >
+                            <div>Rendered features here: {{ inspectDebug.totalFeaturesAtPoint }}</div>
+                            <div class='mt-1'>
+                                Overlays toggled on:
+                                <span v-if='!inspectDebug.visibleOverlays.length'>none</span>
+                            </div>
+                            <div
+                                v-for='o in inspectDebug.visibleOverlays'
+                                :key='o.id'
+                            >
+                                • {{ o.name }} (id {{ o.id }}, type {{ o.type || '?' }})
+                            </div>
+                            <div class='mt-1'>
+                                Layers rendered at point (layerId ← source):
+                                <span v-if='!inspectDebug.sampleLayers.length'>none</span>
+                            </div>
+                            <div
+                                v-for='(l, i) in inspectDebug.sampleLayers'
+                                :key='i'
+                            >
+                                • {{ l.layerId }} ← {{ l.source || '(none)' }}
+                            </div>
+                        </div>
                     </div>
                     <div
                         v-for='(r, i) in inspectResults'
@@ -279,6 +305,10 @@
                             v-if='f.mandatory'
                             class='text-danger'
                         >*</span>
+                        <code
+                            class='text-muted ms-1'
+                            title='custom field id — use in overlay-field-map.ts'
+                        >#{{ f.id }}</code>
                     </label>
 
                     <textarea
@@ -389,12 +419,14 @@ import {
 import { OVERLAY_FIELD_MAP } from '../lib/overlay-field-map.ts';
 import {
     inspectAtPoint,
+    debugAtPoint,
     detectValues,
     normalizeLabel,
     type MapLike,
     type OverlayLike,
     type InspectResult,
     type DetectResult,
+    type DetectDebug,
 } from '../lib/overlay-detect.ts';
 
 // Core CloudTAK surfaces (unofficial — see docs/PLAN-submit-incident.md "RESOLVED").
@@ -419,6 +451,7 @@ const cfLoading = ref(false);
 
 const hasOverlayMapping = OVERLAY_FIELD_MAP.length > 0;
 const inspectResults = ref<InspectResult[] | null>(null);
+const inspectDebug = ref<DetectDebug | null>(null);
 const detecting = ref(false);
 const detectStatus = ref<{ applied: string[]; unmatched: string[] } | null>(null);
 // Field id → entered value. Heterogeneous by field type: string for text/number/date/time,
@@ -566,10 +599,12 @@ async function recenterTo(lonLat: [number, number]): Promise<MapLike | null> {
     if (!map) return null;
     map.jumpTo({ center: lonLat });
     await new Promise<void>((resolve) => {
-        const done = () => resolve();
+        let settled = false;
+        const done = () => { if (!settled) { settled = true; resolve(); } };
+        // Resolve once tiles for the new center have loaded and rendering is idle.
         map.once('idle', done);
-        // Safety: don't hang if 'idle' never fires.
-        setTimeout(done, 1500);
+        // Safety: don't hang forever if 'idle' never fires (long fallback so far jumps can load).
+        setTimeout(done, 4000);
     });
     return map;
 }
@@ -580,13 +615,17 @@ async function onInspect(): Promise<void> {
     const lonLat: [number, number] = [selectedPoint.value.lon, selectedPoint.value.lat];
     const map = await recenterTo(lonLat);
     if (!map) return;
-    inspectResults.value = inspectAtPoint(map, overlaysFromStore(), lonLat);
+    const overlays = overlaysFromStore();
+    inspectResults.value = inspectAtPoint(map, overlays, lonLat);
+    // If nothing matched, capture what IS rendered there to diagnose source/layer mismatches.
+    inspectDebug.value = inspectResults.value.length ? null : debugAtPoint(map, overlays, lonLat);
 }
 
 async function onDetect(): Promise<void> {
     if (!selectedPoint.value || !hasOverlayMapping) return;
     detecting.value = true;
     inspectResults.value = null;
+    inspectDebug.value = null;
     try {
         const lonLat: [number, number] = [selectedPoint.value.lon, selectedPoint.value.lat];
         const map = await recenterTo(lonLat);
@@ -632,6 +671,7 @@ watch(selectedPointId, (id) => {
 
 async function onMissionChange(): Promise<void> {
     inspectResults.value = null;
+    inspectDebug.value = null;
     detectStatus.value = null;
     await loadMission(selectedMissionGuid.value);
 }
