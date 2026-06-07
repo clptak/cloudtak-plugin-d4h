@@ -145,10 +145,10 @@ export const OVERLAY_FIELD_MAP: OverlayFieldMapping[] = [
         },
     },
     {
-        customFieldId: 1483, // TODO: replace with the real D4H "Wilderness" field id (#id shown in the tab)
-        overlayLayerId: 'Wilderness-poly',
-        attribute: 'NAME',
-        note: 'Wilderness Name',
+        customFieldId: 1483, // WILDERNESS AREA NAME (TEXT field — value passes through as-is)
+        overlayLayerId: 'wilderness-poly',
+        attribute: 'NAME', // this layer uses `wildernessname`; the lowercase `wilderness-poly` uses `NAME`
+        note: 'Wilderness Area Name',
     },
 
     // Wilderness — the D4H field is TEXT, so NO valueMap is needed: the raw overlay
