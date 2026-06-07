@@ -148,9 +148,20 @@ export function detectValues(
     return mapping.map((m) => {
         const props = byLayer.get(m.overlayLayerId);
         const raw = props ? props[m.attribute] : undefined;
-        const value = raw == null || raw === '' ? null : String(raw);
+        const rawStr = raw == null || raw === '' ? null : String(raw);
+        const value = rawStr == null ? null : translateValue(rawStr, m.valueMap);
         return { customFieldId: m.customFieldId, overlayLayerId: m.overlayLayerId, attribute: m.attribute, value };
     });
+}
+
+/** Translate an overlay value to its D4H equivalent via the row's valueMap (normalized key match). */
+function translateValue(raw: string, valueMap?: Record<string, string>): string {
+    if (!valueMap) return raw;
+    const norm = normalizeLabel(raw);
+    for (const [k, v] of Object.entries(valueMap)) {
+        if (normalizeLabel(k) === norm) return v;
+    }
+    return raw; // unmapped → pass through (may still match a D4H option directly)
 }
 
 /** Normalize for option-label matching: lowercase, trim, collapse internal whitespace. */

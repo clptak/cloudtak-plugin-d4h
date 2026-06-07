@@ -13,9 +13,12 @@
 //   4. Add a row below.
 //
 // Matching behavior at detect time:
-//   - SINGLE_CHOICE / MULTIPLE_CHOICE fields: the detected value is matched (case-insensitive,
-//     whitespace-normalized) against the field's option labels; the matching option id is selected.
-//   - TEXT / TEXT_AREA / NUMBER / DATE / DATETIME / TIME fields: the detected value is written as-is.
+//   1. The raw overlay value is first run through `valueMap` (if present) to translate the overlay's
+//      label into the exact D4H value/option label. Keys match case-insensitively + whitespace-
+//      normalized; an unmapped value passes through unchanged.
+//   2. SINGLE_CHOICE / MULTIPLE_CHOICE fields: the (translated) value is matched (case-insensitive,
+//      whitespace-normalized) against the field's option labels; the matching option id is selected.
+//      TEXT / TEXT_AREA / NUMBER / DATE / DATETIME / TIME fields: the (translated) value is written as-is.
 //
 // Note: auto-detect can only read overlays that are toggled ON. The "Detect" button recenters the
 // map on the point first so the overlay tiles are rendered there before querying.
@@ -27,6 +30,13 @@ export interface OverlayFieldMapping {
     overlayLayerId: string;
     /** Property key on that overlay's features whose value to use, e.g. "DISTRICT_NAME". */
     attribute: string;
+    /**
+     * Optional translation from the overlay's attribute value → the D4H value/option label.
+     * Use when the overlay's wording differs from D4H's, e.g.
+     *   { 'Red Rock Ranger District': 'USFS COCONINO-RED ROCK RANGER DISTRICT' }
+     * Keys are matched case-insensitively and whitespace-normalized. Unlisted values pass through.
+     */
+    valueMap?: Record<string, string>;
     /** Optional human note — ignored by code. */
     note?: string;
 }
@@ -36,4 +46,39 @@ export const OVERLAY_FIELD_MAP: OverlayFieldMapping[] = [
     // { customFieldId: 1001, overlayLayerId: '57-fill', attribute: 'DISTRICT_NAME', note: 'BOS District' },
     // { customFieldId: 1002, overlayLayerId: '61-fill', attribute: 'LMU_NAME',      note: 'Land Mgmt District' },
     // { customFieldId: 1003, overlayLayerId: '63-fill', attribute: 'WILDERNESS',    note: 'Wilderness Incursion' },
+    {
+        customFieldId: 1001, // TODO: replace with the real D4H "Land Management" field id (#id shown in the tab)
+        overlayLayerId: '1202-136-poly',
+        attribute: 'districtname',
+        note: 'Land Management District',
+        valueMap: {
+            // overlay value (districtname)        : D4H option label (must match exactly after normalize)
+            'Red Rock Ranger District': 'USFS COCONINO-RED ROCK RANGER DISTRICT',
+            'Williams Ranger District': 'USFS KAIBAB-WILLIAMS RANGER DISTRICT',
+            'Tusayan Ranger District': 'USFS KAIBAB-TUSAYAN RANGER DISTRICT',
+            'North Kaibab Ranger District': 'USFS KAIBAB-NORTH KAIBAB RANGER DISTRICT',
+            'Flagstaff Ranger District': 'USFS COCONINO-FLAGSTAFF RANGER DISTRICT',
+            'Mogollon Rim Ranger District': 'USFS COCONINO-MOGOLLON RIM RANGER DISTRICT',
+            'Black Mesa Ranger District': 'USFS A-S - BLACK MESA RANGER DISTRICT',
+            'Verde Ranger District': 'USFS PRESCOTT - VERDE RANGER DISTRICT',
+            'Chino Valley Ranger District': 'USFS PRESCOTT - CHINO VALLEY RANGER DISTRICT',
+            // add the rest of your districts here, e.g.:
+            // 'Mogollon Rim Ranger District': 'USFS COCONINO-MOGOLLON RIM RANGER DISTRICT',
+        },
+    },
+    {
+        customFieldId: 1002, // TODO: replace with the real D4H "Wilderness" field id (#id shown in the tab)
+        overlayLayerId: '1208-wilderness-poly',
+        attribute: 'NAME',
+        note: 'Wilderness Name',
+    },
+
+    // Wilderness — the D4H field is TEXT, so NO valueMap is needed: the raw overlay
+    // attribute value is written into the field as-is. Fill in the three values and uncomment.
+    // {
+    //     customFieldId: 0,                 // <- the Wilderness D4H TEXT field's #id (shown in the tab)
+    //     overlayLayerId: 'REPLACE-poly',   // <- from "Inspect overlays at point"
+    //     attribute: 'REPLACE',             // <- the property key holding the wilderness name
+    //     note: 'Wilderness Incursion',
+    // },
 ];
