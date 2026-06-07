@@ -73,6 +73,87 @@
                 </div>
             </div>
 
+            <!-- Overlay attribute detection -->
+            <div
+                v-if='selectedPoint'
+                class='mb-3'
+            >
+                <div class='d-flex gap-2 flex-wrap'>
+                    <button
+                        type='button'
+                        class='btn btn-outline-secondary btn-sm'
+                        @click='onInspect'
+                    >
+                        Inspect overlays at point
+                    </button>
+                    <button
+                        v-if='hasOverlayMapping'
+                        type='button'
+                        class='btn btn-outline-primary btn-sm'
+                        :disabled='detecting'
+                        @click='onDetect'
+                    >
+                        {{ detecting ? 'Detecting…' : 'Detect mapped fields' }}
+                    </button>
+                </div>
+                <div class='form-text small'>
+                    Reads attributes from overlays that are toggled on. The map recenters on the point first.
+                    <span v-if='!hasOverlayMapping'>Add rows to <code>lib/overlay-field-map.ts</code> to enable auto-fill.</span>
+                </div>
+
+                <!-- Inspect output: layer ids + property keys for authoring the mapping -->
+                <div
+                    v-if='inspectResults'
+                    class='border rounded p-2 mt-1 small'
+                    style='max-height:30vh;overflow:auto'
+                >
+                    <div
+                        v-if='!inspectResults.length'
+                        class='text-muted'
+                    >
+                        No clickable overlay features at this point (is the overlay on and a vector layer?).
+                    </div>
+                    <div
+                        v-for='(r, i) in inspectResults'
+                        :key='i'
+                        class='mb-2'
+                    >
+                        <div class='fw-semibold'>
+                            {{ r.overlayName }}
+                            <code class='text-muted'>{{ r.layerId }}</code>
+                        </div>
+                        <div
+                            v-for='(val, key) in r.properties'
+                            :key='key'
+                            class='font-monospace'
+                        >
+                            {{ key }}: {{ val }}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Detect output -->
+                <div
+                    v-if='detectStatus'
+                    class='mt-1 small'
+                >
+                    <div
+                        v-for='(a, i) in detectStatus.applied'
+                        :key='"a" + i'
+                        class='text-success'
+                    >
+                        ✓ {{ a }}
+                    </div>
+                    <div
+                        v-for='(u, i) in detectStatus.unmatched'
+                        :key='"u" + i'
+                        class='text-muted'
+                    >
+                        • {{ u }}
+                    </div>
+                </div>
+            </div>
+
             <!-- Title → referenceDescription -->
             <div class='mb-3'>
                 <label class='form-label small fw-semibold'>
@@ -304,6 +385,17 @@ import {
     type D4HCustomFieldType,
 } from '../lib/d4h-client.ts';
 
+import { OVERLAY_FIELD_MAP } from '../lib/overlay-field-map.ts';
+import {
+    inspectAtPoint,
+    detectValues,
+    normalizeLabel,
+    type MapLike,
+    type OverlayLike,
+    type InspectResult,
+    type DetectResult,
+} from '../lib/overlay-detect.ts';
+
 // Core CloudTAK surfaces (unofficial — see docs/PLAN-submit-incident.md "RESOLVED").
 import { useMapStore } from '../../../src/stores/map.ts';
 import { db } from '../../../src/database.ts';
@@ -323,6 +415,11 @@ const groupsLoading = ref(false);
 
 const customFields = ref<D4HCustomField[]>([]);
 const cfLoading = ref(false);
+
+const hasOverlayMapping = OVERLAY_FIELD_MAP.length > 0;
+const inspectResults = ref<InspectResult[] | null>(null);
+const detecting = ref(false);
+const detectStatus = ref<{ applied: string[]; unmatched: string[] } | null>(null);
 // Field id → entered value. Heterogeneous by field type: string for text/number/date/time,
 // number for SINGLE_CHOICE, number[] for MULTIPLE_CHOICE — hence `any` for the v-model slot.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -450,7 +547,83 @@ async function loadCustomFields(): Promise<void> {
     }
 }
 
+// ── Overlay attribute detection ────────────────────────────────────────────────
+type RecenterMap = MapLike & {
+    jumpTo(opts: { center: [number, number] }): void;
+    once(ev: string, cb: () => void): void;
+};
+
+function overlaysFromStore(): OverlayLike[] {
+    return (useMapStore().overlays ?? []) as unknown as OverlayLike[];
+}
+
+/** Recenter the map on the point so the overlay tiles render there, then wait for idle. */
+async function recenterTo(lonLat: [number, number]): Promise<MapLike | null> {
+    const map = useMapStore().map as unknown as RecenterMap | undefined;
+    if (!map) return null;
+    map.jumpTo({ center: lonLat });
+    await new Promise<void>((resolve) => {
+        const done = () => resolve();
+        map.once('idle', done);
+        // Safety: don't hang if 'idle' never fires.
+        setTimeout(done, 1500);
+    });
+    return map;
+}
+
+async function onInspect(): Promise<void> {
+    if (!selectedPoint.value) return;
+    detectStatus.value = null;
+    const lonLat: [number, number] = [selectedPoint.value.lon, selectedPoint.value.lat];
+    const map = await recenterTo(lonLat);
+    if (!map) return;
+    inspectResults.value = inspectAtPoint(map, overlaysFromStore(), lonLat);
+}
+
+async function onDetect(): Promise<void> {
+    if (!selectedPoint.value || !hasOverlayMapping) return;
+    detecting.value = true;
+    inspectResults.value = null;
+    try {
+        const lonLat: [number, number] = [selectedPoint.value.lon, selectedPoint.value.lat];
+        const map = await recenterTo(lonLat);
+        if (!map) return;
+        applyDetected(detectValues(map, overlaysFromStore(), lonLat, OVERLAY_FIELD_MAP));
+    } finally {
+        detecting.value = false;
+    }
+}
+
+function applyDetected(results: DetectResult[]): void {
+    const applied: string[] = [];
+    const unmatched: string[] = [];
+    for (const r of results) {
+        const f = customFields.value.find(cf => cf.id === r.customFieldId);
+        if (!f) { unmatched.push(`field ${r.customFieldId} (not an incident field)`); continue; }
+        if (r.value == null) { unmatched.push(`${f.title}: no overlay value at point`); continue; }
+
+        if (f.type === 'SINGLE_CHOICE' || f.type === 'MULTIPLE_CHOICE') {
+            const opt = f.options.find(o => normalizeLabel(o.label) === normalizeLabel(r.value as string));
+            if (!opt) { unmatched.push(`${f.title}: "${r.value}" has no matching option`); continue; }
+            if (f.type === 'SINGLE_CHOICE') {
+                cfValues[f.id] = opt.id;
+            } else {
+                const arr = Array.isArray(cfValues[f.id]) ? cfValues[f.id] as number[] : [];
+                if (!arr.includes(opt.id)) arr.push(opt.id);
+                cfValues[f.id] = arr;
+            }
+            applied.push(`${f.title} → ${opt.label}`);
+        } else {
+            cfValues[f.id] = r.value;
+            applied.push(`${f.title} → ${r.value}`);
+        }
+    }
+    detectStatus.value = { applied, unmatched };
+}
+
 async function onMissionChange(): Promise<void> {
+    inspectResults.value = null;
+    detectStatus.value = null;
     await loadMission(selectedMissionGuid.value);
 }
 

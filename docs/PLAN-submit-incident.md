@@ -227,6 +227,31 @@ Verify against live data once available: the exact field-record key names from `
 defensively, but confirm `options` is embedded (vs. a separate `/custom-field-options` fetch) and that
 `NUMBER`/`DATE`/`TIME` accept plain-string values.
 
+## Overlay → custom-field auto-fill — DONE (built 2026-06-06)
+
+Reads ArcGIS/GeoJSON **overlay** attributes at the incident's CoT point and fills incident custom
+fields. Confirmed feasible: overlays are `vector`/`geojson` with attribute popups, so
+`map.queryRenderedFeatures` returns their `properties` (CloudTAK's own click handler uses the same
+call). Raster overlays would need ArcGIS REST identify — out of scope.
+
+- **Mapping**: static, Paul-authored `lib/overlay-field-map.ts` —
+  `{ customFieldId, overlayLayerId, attribute }[]` (explicit, per the chosen approach). Ships empty
+  with commented examples.
+- **`lib/overlay-detect.ts`**: `inspectAtPoint()` (dumps every clickable overlay feature's layer id +
+  properties — the authoring aid for discovering `overlayLayerId`/`attribute`), `detectValues()`
+  (applies the mapping at the point), `clickableLayers()`, `normalizeLabel()`. Structurally typed
+  (`MapLike`/`OverlayLike`) so it doesn't hard-depend on maplibre or the core `Overlay` class.
+- **UI** (Submit tab, under the point picker): "Inspect overlays at point" and "Detect mapped fields".
+  Both recenter the map on the point first (so the overlay tiles render there), then query. Detected
+  values fill choice fields by matching the value to an option label (normalized, case-insensitive →
+  selects the option id) and text fields verbatim; an applied/unmatched summary is shown.
+
+Constraints to remember: auto-detect only sees overlays **toggled on** and **vector/geojson**; the map
+recenters on detect (button-initiated). Typechecks clean under strict `vue-tsc`.
+
+Next-step ideas: trigger detect automatically on point-select (not just button); raster-overlay support
+via ArcGIS `/query`/`/identify`; an in-app mapping editor if hand-editing the file gets old.
+
 Remaining for later phases: selective attendance, involved-persons/injuries, title auto-population, and
 upgrading the native multi-selects to a richer Vue component.
 
