@@ -47,7 +47,7 @@ export const OVERLAY_FIELD_MAP: OverlayFieldMapping[] = [
     // { customFieldId: 1002, overlayLayerId: '61-fill', attribute: 'LMU_NAME',      note: 'Land Mgmt District' },
     // { customFieldId: 1003, overlayLayerId: '63-fill', attribute: 'WILDERNESS',    note: 'Wilderness Incursion' },
     {
-        customFieldId: 1485, // TODO: replace with the real D4H "Land Management" field id (#id shown in the tab)
+        customFieldId: 8032, // TODO: replace with the real D4H "Land Management" field id (#id shown in the tab)
         overlayLayerId: '1202-136-poly',
         attribute: 'districtname',
         note: 'Land Management District',
@@ -64,6 +64,49 @@ export const OVERLAY_FIELD_MAP: OverlayFieldMapping[] = [
             'Chino Valley Ranger District': 'USFS PRESCOTT - CHINO VALLEY RANGER DISTRICT',
             // add the rest of your districts here, e.g.:
             // 'Mogollon Rim Ranger District': 'USFS COCONINO-MOGOLLON RIM RANGER DISTRICT',
+        },
+    },
+    {
+        customFieldId: 1485,
+        overlayLayerId: '1212-landowner-poly',
+        attribute: 'OWNERORMANAGINGAGENCY',
+        note: 'Land Owner or Managing Agency',
+        valueMap: {
+            // overlay value (Land Owner or Managing Agency)        : D4H option label (must match exactly after normalize)
+            'Apache-Sitgreaves National Forests': 'USFS',
+            'Coconino National Forest': 'USFS',
+            'Kaibab National Forest': 'USFS',
+            'Grand Canyon National Park': 'NPS',
+            'Sunset Crater National Monument': 'NPS',
+            'Walnut Canyon National Monument': 'NPS',
+            'Vermilion Cliffs National Monument': 'BLM',
+            'Bureau of Land Management': 'BLM',
+            'Baaj Nwaavjo Itah Kukveni National Monument': 'BLM',
+            'Glen Canyon National Recreation Area': 'NPS',
+            'City of Page': 'MUNICIPAL',
+            'City of Flagstaff': 'MUNICIPAL',
+            'City of Williams': 'MUNICIPAL',
+            'City of Sedona': 'MUNICIPAL',
+            'Navajo Nation': 'TRIBAL',
+            'Hopi Tribal Land': 'TRIBAL',
+            'Hualapai Tribal Land': 'TRIBAL',
+            'Havasupai Tribal Land': 'TRIBAL',
+            'Private': 'PRIVATE',
+            'State Trust': 'STATE',
+        },
+    },
+    {
+        customFieldId: 8033, // TODO: replace with the real D4H "Wilderness" field id (#id shown in the tab)
+        overlayLayerId: '1209-bos-poly',
+        attribute: 'OBJECTID',
+        note: 'Supervisor District',
+        valueMap: {
+            // overlay value (OBJECTID)        : D4H option label (must match exactly after normalize)
+            '1': 'DISTRICT 1',
+            '2': 'DISTRICT 2',
+            '3': 'DISTRICT 3',
+            '4': 'DISTRICT 4',
+            '5': 'DISTRICT 5',
         },
     },
     {
