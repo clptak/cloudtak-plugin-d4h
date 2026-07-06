@@ -616,6 +616,11 @@
                 <SubmitIncidentView @incident-created='onIncidentCreated' />
             </div>
 
+            <!-- Submit roster -->
+            <div v-else-if='activeTab === "submit-roster"'>
+                <SubmitRosterView :roster='roster' />
+            </div>
+
             <div
                 v-if='showConfig'
                 class='border-top pt-3'
@@ -640,6 +645,7 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import ConfigView from './ConfigView.vue';
 import SubmitIncidentView from './SubmitIncidentView.vue';
+import SubmitRosterView from './SubmitRosterView.vue';
 import D4HIcon from '../lib/D4HIcon.vue';
 import { loadConfig, effectiveBaseUrl, type D4HConfig } from '../lib/d4h-config.ts';
 import { syncNow, loadCachedRoster, loadCachedMeta, liveMeta } from '../lib/d4h-roster.ts';
@@ -666,7 +672,7 @@ const incidentSortDir = ref<'asc' | 'desc'>('desc');
 const syncStatus = ref<{ kind: 'ok' | 'err' | 'info'; title: string; detail?: string } | null>(null);
 const warningsDismissed = ref(false);
 
-type RosterTabKey = 'personnel' | 'equipment' | 'resources' | 'incidents' | 'submit';
+type RosterTabKey = 'personnel' | 'equipment' | 'resources' | 'incidents' | 'submit' | 'submit-roster';
 const activeTab = ref<RosterTabKey>('personnel');
 
 const rosterTabs = computed(() => [
@@ -689,6 +695,10 @@ const rosterTabs = computed(() => [
     {
         key:   'submit' as const,
         label: 'Submit Incident',
+    },
+    {
+        key:   'submit-roster' as const,
+        label: 'Submit Roster',
     },
 ]);
 

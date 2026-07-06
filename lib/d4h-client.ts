@@ -844,3 +844,94 @@ export async function listIncidentCustomFields(config: D4HConfig): Promise<D4HCu
     }
     return out;
 }
+
+// ─── Attendance (submit roster) ────────────────────────────────────────────────
+
+export type D4HAttendanceStatus = 'ABSENT' | 'ATTENDING' | 'REQUESTED';
+
+export interface D4HAttendanceRecord {
+    id?: number;
+    memberId?: number;
+    activityId?: number;
+    status?: D4HAttendanceStatus;
+    startsAt?: string;
+    endsAt?: string;
+}
+
+export interface D4HAttendanceCreate {
+    memberId:   number;
+    activityId: number;
+    status?:    D4HAttendanceStatus;
+    roleId?:    number;
+    startsAt:   string;
+    endsAt:     string;
+}
+
+export interface D4HAttendanceUpdate {
+    status?:  D4HAttendanceStatus;
+    roleId?:  number | null;
+    startsAt?: string;
+    endsAt?:  string;
+}
+
+function normalizeAttendanceRecord(raw: RawRecord): D4HAttendanceRecord | null {
+    const id = typeof raw.id === 'number' ? raw.id : Number(raw.id);
+    const memberId = typeof raw.memberId === 'number' ? raw.memberId : Number(raw.memberId);
+    const activityId = typeof raw.activityId === 'number' ? raw.activityId : Number(raw.activityId);
+    const status = typeof raw.status === 'string' ? raw.status as D4HAttendanceStatus : undefined;
+    return {
+        id:         Number.isFinite(id) ? id : undefined,
+        memberId:   Number.isFinite(memberId) ? memberId : undefined,
+        activityId: Number.isFinite(activityId) ? activityId : undefined,
+        status,
+        startsAt: typeof raw.startsAt === 'string' ? raw.startsAt : undefined,
+        endsAt:   typeof raw.endsAt === 'string' ? raw.endsAt : undefined,
+    };
+}
+
+/** List attendance rows for one activity (GET /attendance?activity_id=…). */
+export async function listActivityAttendance(
+    config: D4HConfig,
+    activityId: number,
+): Promise<D4HAttendanceRecord[]> {
+    const r = await fetchAllPages(config, `${ctxPath(config)}/attendance`, {
+        extraQuery: { activity_id: String(activityId), size: '100' },
+    });
+    const out: D4HAttendanceRecord[] = [];
+    for (const rec of r.records) {
+        const row = normalizeAttendanceRecord(rec as RawRecord);
+        if (row) out.push(row);
+    }
+    return out;
+}
+
+/** Create an activity attendance row (team-scoped POST). */
+export async function createActivityAttendance(
+    config: D4HConfig,
+    payload: D4HAttendanceCreate,
+): Promise<D4HAttendanceRecord> {
+    const body = await writeJson<RawRecord>(config, `${teamPath(config)}/attendance`, {
+        memberId:   payload.memberId,
+        activityId: payload.activityId,
+        status:     payload.status ?? 'ATTENDING',
+        roleId:     payload.roleId,
+        startsAt:   payload.startsAt,
+        endsAt:     payload.endsAt,
+    });
+    return normalizeAttendanceRecord(body) ?? { memberId: payload.memberId, activityId: payload.activityId };
+}
+
+/** Update an activity attendance row (team-scoped PATCH). */
+export async function updateActivityAttendance(
+    config: D4HConfig,
+    attendanceId: number,
+    payload: D4HAttendanceUpdate,
+): Promise<D4HAttendanceRecord> {
+    const body = await writeJson<RawRecord>(
+        config,
+        `${teamPath(config)}/attendance/${attendanceId}`,
+        payload,
+        'PATCH',
+    );
+    return normalizeAttendanceRecord(body) ?? { id: attendanceId };
+}
