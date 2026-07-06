@@ -40,6 +40,9 @@
                     <span v-if='meta.equipmentCount > 0'>
                         · {{ meta.equipmentCount }} equipment item{{ meta.equipmentCount === 1 ? '' : 's' }}
                     </span>
+                    <span v-if='(meta.externalResourceCount ?? 0) > 0'>
+                        · {{ meta.externalResourceCount }} resource{{ meta.externalResourceCount === 1 ? '' : 's' }}
+                    </span>
                 </span>
                 <span
                     v-else
@@ -388,6 +391,86 @@
                 </div>
             </div>
 
+            <!-- External resources (Intelligence → Resources) -->
+            <div v-else-if='activeTab === "resources"'>
+                <div
+                    v-if='roster?.externalResources?.length'
+                    class='card mb-3'
+                >
+                    <div class='card-header py-1 px-2 d-flex align-items-center gap-2 flex-wrap'>
+                        <span class='small fw-semibold'>
+                            External resources ({{ filteredExternalResources.length }}<span
+                                v-if='filteredExternalResources.length !== (roster?.externalResources?.length ?? 0)'
+                                class='text-muted fw-normal'
+                            > of {{ roster?.externalResources?.length ?? 0 }}</span>)
+                        </span>
+                        <input
+                            v-model='resourceFilter'
+                            type='search'
+                            class='form-control form-control-sm ms-auto'
+                            style='max-width:240px'
+                            placeholder='Filter by id or agency name…'
+                        >
+                    </div>
+                    <div
+                        class='table-responsive'
+                        style='max-height:50vh;overflow:auto'
+                    >
+                        <table class='table table-sm table-hover mb-0 small'>
+                            <thead class='sticky-top bg-body'>
+                                <tr>
+                                    <th
+                                        style='width:88px;cursor:pointer;user-select:none'
+                                        @click='toggleResourceSort("id")'
+                                    >
+                                        ID
+                                        <span
+                                            v-if='resourceSortBy === "id"'
+                                            class='text-muted ms-1'
+                                        >{{ resourceSortDir === "asc" ? "▲" : "▼" }}</span>
+                                    </th>
+                                    <th
+                                        style='cursor:pointer;user-select:none'
+                                        @click='toggleResourceSort("name")'
+                                    >
+                                        Agency
+                                        <span
+                                            v-if='resourceSortBy === "name"'
+                                            class='text-muted ms-1'
+                                        >{{ resourceSortDir === "asc" ? "▲" : "▼" }}</span>
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr
+                                    v-for='r in sortedExternalResources'
+                                    :key='r.id'
+                                >
+                                    <td class='font-monospace'>
+                                        {{ r.id }}
+                                    </td>
+                                    <td>{{ r.name }}</td>
+                                </tr>
+                                <tr v-if='sortedExternalResources.length === 0'>
+                                    <td
+                                        colspan='2'
+                                        class='text-center text-muted py-3'
+                                    >
+                                        No resources match the filter.
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div
+                    v-else
+                    class='text-muted small text-center py-4'
+                >
+                    No external resources synced yet — run Sync now (uses D4H search API).
+                </div>
+            </div>
+
             <!-- Submit incident -->
             <div v-else-if='activeTab === "submit"'>
                 <SubmitIncidentView />
@@ -434,10 +517,13 @@ const sortDir    = ref<'asc' | 'desc'>('asc');
 const equipFilter  = ref('');
 const equipSortBy  = ref<'ref' | 'type' | 'make' | 'model' | 'category'>('type');
 const equipSortDir = ref<'asc' | 'desc'>('asc');
+const resourceFilter  = ref('');
+const resourceSortBy  = ref<'id' | 'name'>('name');
+const resourceSortDir = ref<'asc' | 'desc'>('asc');
 const syncStatus = ref<{ kind: 'ok' | 'err' | 'info'; title: string; detail?: string } | null>(null);
 const warningsDismissed = ref(false);
 
-type RosterTabKey = 'personnel' | 'equipment' | 'submit';
+type RosterTabKey = 'personnel' | 'equipment' | 'resources' | 'submit';
 const activeTab = ref<RosterTabKey>('personnel');
 
 const rosterTabs = computed(() => [
@@ -448,6 +534,10 @@ const rosterTabs = computed(() => [
     {
         key:   'equipment' as const,
         label: `Equipment (${meta.value?.equipmentCount ?? roster.value?.equipment.length ?? 0})`,
+    },
+    {
+        key:   'resources' as const,
+        label: `Resources (${meta.value?.externalResourceCount ?? roster.value?.externalResources?.length ?? 0})`,
     },
     {
         key:   'submit' as const,
@@ -573,6 +663,35 @@ function toggleEquipSort(key: 'ref' | 'type' | 'make' | 'model' | 'category'): v
     }
 }
 
+const filteredExternalResources = computed(() => {
+    const list = roster.value?.externalResources ?? [];
+    const q = resourceFilter.value.trim().toLowerCase();
+    if (!q) return list;
+    return list.filter(r =>
+        r.name.toLowerCase().includes(q)
+        || String(r.id).includes(q),
+    );
+});
+
+const sortedExternalResources = computed(() => {
+    const dir = resourceSortDir.value === 'asc' ? 1 : -1;
+    return [...filteredExternalResources.value].sort((a, b) => {
+        if (resourceSortBy.value === 'id') {
+            return (a.id - b.id) * dir;
+        }
+        return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }) * dir;
+    });
+});
+
+function toggleResourceSort(key: 'id' | 'name'): void {
+    if (resourceSortBy.value === key) {
+        resourceSortDir.value = resourceSortDir.value === 'asc' ? 'desc' : 'asc';
+    } else {
+        resourceSortBy.value  = key;
+        resourceSortDir.value = 'asc';
+    }
+}
+
 let metaSub: { unsubscribe: () => void } | null = null;
 
 onMounted(async () => {
@@ -611,6 +730,7 @@ async function onSync(): Promise<void> {
             const detail = [
                 statsLine('Members', result.stats.members),
                 statsLine('Equipment', result.stats.equipment),
+                `External resources: ${result.stats.externalResources.rawCount} unique across ${result.stats.externalResources.queriesRun} search quer${result.stats.externalResources.queriesRun === 1 ? 'y' : 'ies'}`,
                 kept.length
                     ? `Equipment kept: ${kept.map(c => `${c.title} (${c.count})`).join(', ')}`
                     : (cats.length ? `Equipment kept: none of ${cats.length} categories matched` : ''),

@@ -52,6 +52,12 @@ export interface D4HEquipment {
     groups?:   string[];
 }
 
+/** External Resource Tracker agency (Intelligence → Resources). */
+export interface D4HExternalResource {
+    id:   number;
+    name: string;                     // D4H search `title`
+}
+
 export interface D4HRosterMeta {
     fetchedAt:    string;             // ISO
     region:       string;
@@ -59,6 +65,7 @@ export interface D4HRosterMeta {
     contextId:    number;
     memberCount:  number;
     equipmentCount: number;          // count AFTER the category filter (wanted categories only)
+    externalResourceCount?: number;  // External Resource Tracker catalog size
     /** Every distinct equipment category D4H returned, with counts and whether the filter kept it. */
     equipmentCategories?: { title: string; count: number; included: boolean }[];
     /** Warnings collected during sync — e.g. "equipment endpoint returned 404". */
@@ -69,4 +76,6 @@ export interface D4HRoster {
     meta:      D4HRosterMeta;
     members:   D4HMember[];
     equipment: D4HEquipment[];
+    /** External Resource Tracker agencies (Intelligence → Resources). */
+    externalResources?: D4HExternalResource[];
 }

@@ -29,7 +29,7 @@ export default class D4HPlugin implements PluginInstance {
             label:       'D4H',
             route:       ROUTE_NAME,
             tooltip:     'D4H Team Manager roster',
-            description: 'Personnel, qualifications, and equipment from D4H — shared with other plugins',
+            description: 'Personnel, equipment, external resources, and incidents from D4H',
             icon:        markRaw(D4HIcon) as unknown as MenuItemIconType,
         } as MenuItemConfig);
     }

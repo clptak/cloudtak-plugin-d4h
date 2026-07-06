@@ -16,13 +16,13 @@ import KV from '../../../src/base/kv.ts';
 import { liveQuery, type Observable } from 'dexie';
 import { db } from '../../../src/database.ts';
 
-import { fetchMembers, fetchEquipment, fetchEquipmentCategories, fetchEquipmentBrands, fetchEquipmentModels, fetchQualificationCatalog, fetchQualificationAwards } from './d4h-client.ts';
+import { fetchMembers, fetchEquipment, fetchEquipmentCategories, fetchEquipmentBrands, fetchEquipmentModels, fetchQualificationCatalog, fetchQualificationAwards, fetchExternalResources } from './d4h-client.ts';
 import { normalizeMember, normalizeEquipment, normalizeEquipmentCategory, normalizeEquipmentBrand, normalizeEquipmentModel, normalizeQualificationDef, normalizeQualificationAward } from './d4h-normalize.ts';
 import { categoryIsWanted, WANTED_CATEGORY_KEYWORDS } from './d4h-equipment-categories.ts';
 import { isOperationalEquipmentStatus } from './d4h-status.ts';
 import type { D4HConfig } from './d4h-config.ts';
 import type {
-    D4HMember, D4HEquipment, D4HQualification, D4HRoster, D4HRosterMeta,
+    D4HMember, D4HEquipment, D4HQualification, D4HRoster, D4HRosterMeta, D4HExternalResource,
 } from './d4h-types.ts';
 
 export const ROSTER_KEY = 'd4h:roster';
@@ -34,6 +34,12 @@ export interface FetchStats {
     reportedTotal: number | null;
 }
 
+export interface ExternalResourceFetchStats {
+    queriesRun: number;
+    pages:      number;
+    rawCount:   number;
+}
+
 export interface SyncResult {
     ok:        boolean;
     roster?:   D4HRoster;
@@ -41,13 +47,15 @@ export interface SyncResult {
     warnings:  string[];
     /** Per-endpoint pagination stats for the UI to display & sanity-check. */
     stats: {
-        members:        FetchStats;
-        equipment:      FetchStats;
-        qualifications: FetchStats;
+        members:            FetchStats;
+        equipment:          FetchStats;
+        qualifications:     FetchStats;
+        externalResources:  ExternalResourceFetchStats;
     };
 }
 
 const EMPTY_STATS: FetchStats = { pages: 0, rawCount: 0, reportedTotal: null };
+const EMPTY_EXT_STATS: ExternalResourceFetchStats = { queriesRun: 0, pages: 0, rawCount: 0 };
 
 export async function syncNow(config: D4HConfig): Promise<SyncResult> {
     const warnings: string[] = [];
@@ -60,7 +68,7 @@ export async function syncNow(config: D4HConfig): Promise<SyncResult> {
             ok: false,
             error: `Members fetch failed: ${(e as Error).message}`,
             warnings,
-            stats: { members: EMPTY_STATS, equipment: EMPTY_STATS, qualifications: EMPTY_STATS },
+            stats: { members: EMPTY_STATS, equipment: EMPTY_STATS, qualifications: EMPTY_STATS, externalResources: EMPTY_EXT_STATS },
         };
     }
 
@@ -226,6 +234,11 @@ export async function syncNow(config: D4HConfig): Promise<SyncResult> {
         m.qualifications = [...latestByName.values()].sort((a, b) => a.name.localeCompare(b.name));
     }
 
+    // External Resource Tracker (Intelligence → Resources) — search API, best-effort.
+    const extResp = await fetchExternalResources(config);
+    if (extResp.warning) warnings.push(extResp.warning);
+    const externalResources: D4HExternalResource[] = extResp.records;
+
     const stats = {
         members: {
             pages:         membersResp.pages,
@@ -242,6 +255,11 @@ export async function syncNow(config: D4HConfig): Promise<SyncResult> {
             rawCount:      awardResp.records.length,
             reportedTotal: awardResp.reportedTotal,
         },
+        externalResources: {
+            queriesRun: extResp.queriesRun,
+            pages:      extResp.pages,
+            rawCount:   externalResources.length,
+        },
     };
 
     const meta: D4HRosterMeta = {
@@ -251,10 +269,11 @@ export async function syncNow(config: D4HConfig): Promise<SyncResult> {
         contextId:      config.contextId,
         memberCount:    members.length,
         equipmentCount: equipment.length,
+        externalResourceCount: externalResources.length,
         equipmentCategories,
         warnings,
     };
-    const roster: D4HRoster = { meta, members, equipment };
+    const roster: D4HRoster = { meta, members, equipment, externalResources };
 
     try {
         await KV.update(ROSTER_KEY, JSON.stringify(roster));

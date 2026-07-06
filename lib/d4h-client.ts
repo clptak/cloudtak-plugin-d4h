@@ -23,6 +23,7 @@
 
 import { effectiveBaseUrl, type D4HConfig } from './d4h-config.ts';
 import { d4hFetch, D4HTransportError, type D4HHttpResponse } from './d4h-transport.ts';
+import { EXTERNAL_RESOURCE_SEARCH_QUERIES } from './d4h-external-resource-queries.ts';
 
 export type ConnectionTestResult =
     | { ok: true;  sampleCount: number; firstName?: string; baseUrl: string }
@@ -470,6 +471,123 @@ export async function fetchQualificationAwards(config: D4HConfig): Promise<BestE
         `${ctxPath(config)}/member-qualification-awards`,
         `${ctxPath(config)}/qualification-awards`,
     ], 'Qualification awards');
+}
+
+// ─── External resources (Intelligence → Resources) ───────────────────────────
+//
+// D4H has no GET /resources list in API v3. The External Resource Tracker catalog
+// is indexed for GET /search with resource_type=Resource. Search requires a query
+// string (min 3 chars), so we run several terms and dedupe by id.
+
+const RESOURCE_SEARCH_PAGE_SIZE = 100;
+
+interface ResourceSearchEnvelope {
+    results?: Array<{ id?: unknown; title?: unknown; resourceType?: unknown }>;
+}
+
+export interface ExternalResourceRecord {
+    id:   number;
+    name: string;
+}
+
+export interface ExternalResourcesFetchResult {
+    records:    ExternalResourceRecord[];
+    queriesRun: number;
+    pages:      number;
+    warning?:   string;
+}
+
+async function searchExternalResourcesPage(
+    config: D4HConfig,
+    query:  string,
+    page:   number,
+): Promise<ResourceSearchEnvelope> {
+    const baseUrl = effectiveBaseUrl(config);
+    const params = new URLSearchParams({
+        query:         query,
+        resource_type: 'Resource',
+        page:          String(page),
+        size:          String(RESOURCE_SEARCH_PAGE_SIZE),
+    });
+    const url = `${baseUrl}${ctxPath(config)}/search?${params.toString()}`;
+    console.debug(`[d4h] GET ${url}`);
+
+    const res = await d4hFetch(url, {
+        method:  'GET',
+        cache:   'no-store',
+        headers: authHeaders(config),
+    });
+    if (!res.ok) {
+        const detail = await res.text().catch(() => '');
+        const err = new Error(`HTTP ${res.status} ${res.statusText} — ${detail.slice(0, 400)}`);
+        (err as Error & { status?: number }).status = res.status;
+        throw err;
+    }
+    return await res.json() as ResourceSearchEnvelope;
+}
+
+async function searchExternalResourcesForQuery(
+    config: D4HConfig,
+    query:  string,
+): Promise<{ records: ExternalResourceRecord[]; pages: number }> {
+    const out: ExternalResourceRecord[] = [];
+    let pages = 0;
+
+    for (let page = 0; page < 50; page++) {
+        const body = await searchExternalResourcesPage(config, query, page);
+        const results = Array.isArray(body.results) ? body.results : [];
+        pages++;
+
+        for (const row of results) {
+            const id = typeof row.id === 'number' ? row.id : Number(row.id);
+            const name = typeof row.title === 'string' ? row.title.trim() : '';
+            if (!Number.isFinite(id) || !name) continue;
+            out.push({ id, name });
+        }
+
+        if (results.length === 0 || results.length < RESOURCE_SEARCH_PAGE_SIZE) break;
+    }
+
+    return { records: out, pages };
+}
+
+/**
+ * External Resource Tracker catalog (Intelligence → Resources). Best-effort: runs
+ * multiple search queries, dedupes by id, returns sorted ascending by agency name.
+ */
+export async function fetchExternalResources(config: D4HConfig): Promise<ExternalResourcesFetchResult> {
+    const seen = new Map<number, ExternalResourceRecord>();
+    let pages = 0;
+    let queriesRun = 0;
+    const errors: string[] = [];
+
+    for (const query of EXTERNAL_RESOURCE_SEARCH_QUERIES) {
+        try {
+            const r = await searchExternalResourcesForQuery(config, query);
+            queriesRun++;
+            pages += r.pages;
+            for (const rec of r.records) {
+                if (!seen.has(rec.id)) seen.set(rec.id, rec);
+            }
+        } catch (e) {
+            errors.push(`${query}: ${(e as Error).message}`);
+        }
+    }
+
+    const records = [...seen.values()].sort((a, b) =>
+        a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }),
+    );
+
+    let warning: string | undefined;
+    if (errors.length === EXTERNAL_RESOURCE_SEARCH_QUERIES.length) {
+        warning = `External resources fetch failed for all search queries. ${errors.join(' | ')}`;
+    } else if (errors.length > 0) {
+        warning = `External resources: ${errors.length} search quer${errors.length === 1 ? 'y' : 'ies'} failed (${errors.join(' | ')}).`;
+    } else if (records.length === 0) {
+        warning = 'External resources search returned 0 agencies — is the resources module enabled (Intelligence → Resources)?';
+    }
+
+    return { records, queriesRun, pages, warning };
 }
 
 // ─── Writes (Phase: submit incident) ───────────────────────────────────────────
