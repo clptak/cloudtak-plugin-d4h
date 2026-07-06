@@ -686,8 +686,12 @@ async function writeJson<T = unknown>(
         const detail = typeof parsed === 'string'
             ? parsed
             : JSON.stringify(parsed ?? {});
-        const err = new Error(`HTTP ${res.status} ${res.statusText} — ${detail.slice(0, 400)}`);
-        (err as Error & { status?: number }).status = res.status;
+        const err = new Error(`HTTP ${res.status} ${res.statusText} — ${detail.slice(0, 400)}`) as Error & {
+            status?: number;
+            body?: unknown;
+        };
+        err.status = res.status;
+        err.body = parsed;
         throw err;
     }
 
@@ -934,4 +938,146 @@ export async function updateActivityAttendance(
         'PATCH',
     );
     return normalizeAttendanceRecord(body) ?? { id: attendanceId };
+}
+
+// ─── Involved persons (submit subject) ─────────────────────────────────────────
+
+export interface D4HInvolvementType {
+    id:    number;
+    title: string;
+}
+
+export interface D4HInvolvedOutcome {
+    id:                number;
+    title:             string;
+    involvementTypeId: number;
+}
+
+export interface D4HInvolvedMetadata {
+    involvementTypes: D4HInvolvementType[];
+    outcomes:         D4HInvolvedOutcome[];
+}
+
+export type D4HInvolvedSex = 'MALE' | 'FEMALE' | 'OTHER';
+export type D4HInvolvedAreaKnowledge = 'UNFAMILIAR' | 'FAMILIAR';
+export type D4HInvolvedCause = 'NO_DATA' | 'ACCIDENTAL' | 'INTENTIONAL_SELF' | 'INTENTIONAL_OTHER' | 'UNDETERMINED';
+export type D4HInvolvedHandover = 'NO_FURTHER_ASSISTANCE' | 'HOSPITAL' | 'ONSITE_FACILITY';
+export type D4HInvolvedSpinalInjury = 'SUSPECTED' | 'CLEARED' | 'NOT_INDICATED' | 'UNDETERMINED';
+export type D4HInvolvedTransfer = 'SELF' | 'HOSPITAL';
+
+export interface D4HInvolvedPersonCreate {
+    incidentId:         number;
+    involvementTypeId:  number;
+    name?:              string;
+    age?:               number;
+    dateOfBirth?:       string;
+    sex?:               D4HInvolvedSex;
+    nationality?:       string;
+    areaKnowledge?:     D4HInvolvedAreaKnowledge;
+    cause?:             D4HInvolvedCause;
+    handover?:          D4HInvolvedHandover;
+    spinalInjury?:      D4HInvolvedSpinalInjury;
+    transfer?:          D4HInvolvedTransfer;
+    assistance?:        string;
+    contact?:           string;
+    involvementNotes?:  string;
+    outcomeId?:         number;
+    customFieldValues?: Array<{ id: number; value: number[] | string | null }>;
+}
+
+function numField(raw: unknown): number | undefined {
+    const n = typeof raw === 'number' ? raw : Number(raw);
+    return Number.isFinite(n) ? n : undefined;
+}
+
+/** Lookup tables for involved-person forms — GET /incident-involved-metadata. */
+export async function fetchIncidentInvolvedMetadata(config: D4HConfig): Promise<D4HInvolvedMetadata> {
+    const url = `${effectiveBaseUrl(config)}${ctxPath(config)}/incident-involved-metadata`;
+    const res = await d4hFetch(url, {
+        method:  'GET',
+        headers: {
+            'Authorization': `Bearer ${config.token}`,
+            'Accept':        'application/json',
+        },
+    });
+    const text = await res.text().catch(() => '');
+    let parsed: unknown = {};
+    if (text) { try { parsed = JSON.parse(text); } catch { parsed = {}; } }
+    if (!res.ok) {
+        const err = new Error(`HTTP ${res.status} ${res.statusText} — ${text.slice(0, 400)}`);
+        (err as Error & { status?: number }).status = res.status;
+        throw err;
+    }
+
+    const body = parsed as Record<string, unknown>;
+    const involvementTypes: D4HInvolvementType[] = [];
+    for (const rec of Array.isArray(body.involvementTypes) ? body.involvementTypes : []) {
+        const o = rec as Record<string, unknown>;
+        const id = numField(o.id);
+        const title = typeof o.title === 'string' ? o.title : '';
+        if (id != null && title) involvementTypes.push({ id, title });
+    }
+    involvementTypes.sort((a, b) => a.title.localeCompare(b.title));
+
+    const outcomes: D4HInvolvedOutcome[] = [];
+    for (const rec of Array.isArray(body.outcomes) ? body.outcomes : []) {
+        const o = rec as Record<string, unknown>;
+        const id = numField(o.id);
+        const involvementTypeId = numField(o.involvementTypeId);
+        const title = typeof o.title === 'string' ? o.title : '';
+        if (id != null && involvementTypeId != null && title) {
+            outcomes.push({ id, title, involvementTypeId });
+        }
+    }
+    outcomes.sort((a, b) => a.title.localeCompare(b.title));
+
+    return { involvementTypes, outcomes };
+}
+
+/** Person-involved custom-field definitions (target_resource_type=PersonInvolved). */
+export async function listPersonInvolvedCustomFields(config: D4HConfig): Promise<D4HCustomField[]> {
+    const r = await fetchAllPages(config, `${ctxPath(config)}/custom-fields`, {
+        extraQuery: { target_resource_type: 'PersonInvolved', sort: 'ordering', order: 'asc' },
+    });
+
+    const out: D4HCustomField[] = [];
+    for (const rec of r.records) {
+        const o = rec as Record<string, unknown>;
+        if (o.archived === true) continue;
+
+        const id = typeof o.id === 'number' ? o.id : Number(o.id);
+        const type = String(o.type ?? '') as D4HCustomFieldType;
+        if (!Number.isFinite(id) || !type) continue;
+
+        const rawOptions = Array.isArray(o.options) ? o.options : [];
+        const options: D4HCustomFieldOption[] = CHOICE_TYPES.has(type)
+            ? rawOptions
+                .map((op) => {
+                    const oo = op as Record<string, unknown>;
+                    const oid = typeof oo.id === 'number' ? oo.id : Number(oo.id);
+                    const label = String(oo.label ?? oo.title ?? oid);
+                    return { id: oid, label };
+                })
+                .filter((op) => Number.isFinite(op.id))
+            : [];
+
+        out.push({
+            id,
+            title:     String(o.title ?? `Field ${id}`),
+            type,
+            hint:      typeof o.hint === 'string' && o.hint ? o.hint : undefined,
+            mandatory: o.mandatory === true || o.mandatory === 'true',
+            options,
+        });
+    }
+    return out;
+}
+
+/** Create a person-involved record (team-scoped POST). */
+export async function createIncidentInvolvedPerson(
+    config: D4HConfig,
+    payload: D4HInvolvedPersonCreate,
+): Promise<Record<string, unknown>> {
+    console.debug('[d4h] POST incident-involved-persons', payload);
+    return writeJson<Record<string, unknown>>(config, `${teamPath(config)}/incident-involved-persons`, payload);
 }
