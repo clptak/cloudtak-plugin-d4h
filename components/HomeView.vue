@@ -43,6 +43,9 @@
                     <span v-if='(meta.externalResourceCount ?? 0) > 0'>
                         · {{ meta.externalResourceCount }} resource{{ meta.externalResourceCount === 1 ? '' : 's' }}
                     </span>
+                    <span v-if='(meta.incidentCount ?? 0) > 0'>
+                        · {{ meta.incidentCount }} incident{{ meta.incidentCount === 1 ? '' : 's' }}
+                    </span>
                 </span>
                 <span
                     v-else
@@ -471,6 +474,143 @@
                 </div>
             </div>
 
+            <!-- Incidents (last 30 days) -->
+            <div v-else-if='activeTab === "incidents"'>
+                <div
+                    v-if='roster?.incidents?.length'
+                    class='card mb-3'
+                >
+                    <div class='card-header py-1 px-2 d-flex align-items-center gap-2 flex-wrap'>
+                        <span class='small fw-semibold'>
+                            Incidents — last 30 days ({{ filteredIncidents.length }}<span
+                                v-if='filteredIncidents.length !== (roster?.incidents?.length ?? 0)'
+                                class='text-muted fw-normal'
+                            > of {{ roster?.incidents?.length ?? 0 }}</span>)
+                        </span>
+                        <input
+                            v-model='incidentFilter'
+                            type='search'
+                            class='form-control form-control-sm ms-auto'
+                            style='max-width:280px'
+                            placeholder='Filter by ref, title, tracking #…'
+                        >
+                    </div>
+                    <div
+                        class='table-responsive'
+                        style='max-height:50vh;overflow:auto'
+                    >
+                        <table class='table table-sm table-hover mb-0 small'>
+                            <thead class='sticky-top bg-body'>
+                                <tr>
+                                    <th
+                                        style='width:72px;cursor:pointer;user-select:none'
+                                        @click='toggleIncidentSort("reference")'
+                                    >
+                                        Ref
+                                        <span
+                                            v-if='incidentSortBy === "reference"'
+                                            class='text-muted ms-1'
+                                        >{{ incidentSortDir === "asc" ? "▲" : "▼" }}</span>
+                                    </th>
+                                    <th
+                                        style='cursor:pointer;user-select:none'
+                                        @click='toggleIncidentSort("title")'
+                                    >
+                                        Title
+                                        <span
+                                            v-if='incidentSortBy === "title"'
+                                            class='text-muted ms-1'
+                                        >{{ incidentSortDir === "asc" ? "▲" : "▼" }}</span>
+                                    </th>
+                                    <th
+                                        style='width:100px;cursor:pointer;user-select:none'
+                                        @click='toggleIncidentSort("startsAt")'
+                                    >
+                                        Started
+                                        <span
+                                            v-if='incidentSortBy === "startsAt"'
+                                            class='text-muted ms-1'
+                                        >{{ incidentSortDir === "asc" ? "▲" : "▼" }}</span>
+                                    </th>
+                                    <th
+                                        style='width:100px;cursor:pointer;user-select:none'
+                                        @click='toggleIncidentSort("endsAt")'
+                                    >
+                                        Ended
+                                        <span
+                                            v-if='incidentSortBy === "endsAt"'
+                                            class='text-muted ms-1'
+                                        >{{ incidentSortDir === "asc" ? "▲" : "▼" }}</span>
+                                    </th>
+                                    <th
+                                        style='width:88px;cursor:pointer;user-select:none'
+                                        @click='toggleIncidentSort("trackingNumber")'
+                                    >
+                                        Tracking #
+                                        <span
+                                            v-if='incidentSortBy === "trackingNumber"'
+                                            class='text-muted ms-1'
+                                        >{{ incidentSortDir === "asc" ? "▲" : "▼" }}</span>
+                                    </th>
+                                    <th style='width:56px'>
+                                        Pub.
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr
+                                    v-for='inc in sortedIncidents'
+                                    :key='inc.id'
+                                    :title='inc.description || undefined'
+                                >
+                                    <td class='font-monospace'>
+                                        {{ inc.reference ?? inc.id }}
+                                    </td>
+                                    <td>{{ inc.title }}</td>
+                                    <td class='text-nowrap'>
+                                        {{ formatIncidentDate(inc.startsAt) }}
+                                    </td>
+                                    <td class='text-nowrap'>
+                                        {{ formatIncidentDate(inc.endsAt) || '—' }}
+                                    </td>
+                                    <td class='font-monospace'>
+                                        {{ inc.trackingNumber ?? '—' }}
+                                    </td>
+                                    <td>
+                                        <span
+                                            v-if='inc.published === true'
+                                            class='badge bg-success'
+                                        >Yes</span>
+                                        <span
+                                            v-else-if='inc.published === false'
+                                            class='badge bg-secondary'
+                                        >No</span>
+                                        <span
+                                            v-else
+                                            class='text-muted'
+                                        >—</span>
+                                    </td>
+                                </tr>
+                                <tr v-if='sortedIncidents.length === 0'>
+                                    <td
+                                        colspan='6'
+                                        class='text-center text-muted py-3'
+                                    >
+                                        No incidents match the filter.
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div
+                    v-else
+                    class='text-muted small text-center py-4'
+                >
+                    No incidents in the last 30 days — run Sync now.
+                </div>
+            </div>
+
             <!-- Submit incident -->
             <div v-else-if='activeTab === "submit"'>
                 <SubmitIncidentView />
@@ -520,10 +660,13 @@ const equipSortDir = ref<'asc' | 'desc'>('asc');
 const resourceFilter  = ref('');
 const resourceSortBy  = ref<'id' | 'name'>('name');
 const resourceSortDir = ref<'asc' | 'desc'>('asc');
+const incidentFilter  = ref('');
+const incidentSortBy  = ref<'reference' | 'title' | 'startsAt' | 'endsAt' | 'trackingNumber'>('startsAt');
+const incidentSortDir = ref<'asc' | 'desc'>('desc');
 const syncStatus = ref<{ kind: 'ok' | 'err' | 'info'; title: string; detail?: string } | null>(null);
 const warningsDismissed = ref(false);
 
-type RosterTabKey = 'personnel' | 'equipment' | 'resources' | 'submit';
+type RosterTabKey = 'personnel' | 'equipment' | 'resources' | 'incidents' | 'submit';
 const activeTab = ref<RosterTabKey>('personnel');
 
 const rosterTabs = computed(() => [
@@ -538,6 +681,10 @@ const rosterTabs = computed(() => [
     {
         key:   'resources' as const,
         label: `Resources (${meta.value?.externalResourceCount ?? roster.value?.externalResources?.length ?? 0})`,
+    },
+    {
+        key:   'incidents' as const,
+        label: `Incidents (${meta.value?.incidentCount ?? roster.value?.incidents?.length ?? 0})`,
     },
     {
         key:   'submit' as const,
@@ -692,6 +839,50 @@ function toggleResourceSort(key: 'id' | 'name'): void {
     }
 }
 
+const filteredIncidents = computed(() => {
+    const list = roster.value?.incidents ?? [];
+    const q = incidentFilter.value.trim().toLowerCase();
+    if (!q) return list;
+    return list.filter(inc =>
+        String(inc.id).includes(q)
+        || (inc.reference && inc.reference.toLowerCase().includes(q))
+        || inc.title.toLowerCase().includes(q)
+        || (inc.trackingNumber && inc.trackingNumber.toLowerCase().includes(q))
+        || (inc.description && inc.description.toLowerCase().includes(q)),
+    );
+});
+
+const sortedIncidents = computed(() => {
+    const dir = incidentSortDir.value === 'asc' ? 1 : -1;
+    return [...filteredIncidents.value].sort((a, b) => {
+        if (incidentSortBy.value === 'startsAt' || incidentSortBy.value === 'endsAt') {
+            const av = a[incidentSortBy.value] ?? '';
+            const bv = b[incidentSortBy.value] ?? '';
+            return av.localeCompare(bv) * dir;
+        }
+        const field = incidentSortBy.value;
+        const av = (field === 'reference' ? (a.reference ?? String(a.id)) : (a[field] ?? '')).toLowerCase();
+        const bv = (field === 'reference' ? (b.reference ?? String(b.id)) : (b[field] ?? '')).toLowerCase();
+        return av.localeCompare(bv, undefined, { sensitivity: 'base' }) * dir;
+    });
+});
+
+function toggleIncidentSort(key: 'reference' | 'title' | 'startsAt' | 'endsAt' | 'trackingNumber'): void {
+    if (incidentSortBy.value === key) {
+        incidentSortDir.value = incidentSortDir.value === 'asc' ? 'desc' : 'asc';
+    } else {
+        incidentSortBy.value  = key;
+        incidentSortDir.value = key === 'startsAt' ? 'desc' : 'asc';
+    }
+}
+
+function formatIncidentDate(iso?: string): string {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return iso.slice(0, 10);
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
 let metaSub: { unsubscribe: () => void } | null = null;
 
 onMounted(async () => {
@@ -731,6 +922,7 @@ async function onSync(): Promise<void> {
                 statsLine('Members', result.stats.members),
                 statsLine('Equipment', result.stats.equipment),
                 `External resources: ${result.stats.externalResources.rawCount} unique across ${result.stats.externalResources.queriesRun} search quer${result.stats.externalResources.queriesRun === 1 ? 'y' : 'ies'}`,
+                statsLine('Incidents (last 30 days)', result.stats.incidents),
                 kept.length
                     ? `Equipment kept: ${kept.map(c => `${c.title} (${c.count})`).join(', ')}`
                     : (cats.length ? `Equipment kept: none of ${cats.length} categories matched` : ''),

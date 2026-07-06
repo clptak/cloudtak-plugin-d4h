@@ -19,7 +19,7 @@
 // We accept extra fields silently (D4H adds them; we don't care). We only fail loudly
 // if id/name are missing, because those are the keys that make a member useful at all.
 
-import type { D4HMember, D4HEquipment, D4HStatus } from './d4h-types.ts';
+import type { D4HMember, D4HEquipment, D4HIncident, D4HStatus } from './d4h-types.ts';
 
 type Json = Record<string, unknown>;
 
@@ -195,4 +195,27 @@ export function normalizeQualificationAward(
         str(raw.endsAt) ?? str(raw.expiresAt) ?? str(raw.expires_at) ?? str(raw.expiry);
 
     return { id, memberId, qualId, expiresAt };
+}
+
+/** Incident list row from GET /incidents (swagger example shape). */
+export function normalizeIncident(raw: Json): D4HIncident | null {
+    const id = num(raw.id);
+    if (id === undefined) return null;
+
+    const reference = str(raw.reference);
+    const title =
+        str(raw.referenceDescription) ??
+        reference ??
+        `Incident ${id}`;
+
+    return {
+        id,
+        reference,
+        title,
+        startsAt:       str(raw.startsAt),
+        endsAt:         str(raw.endsAt),
+        trackingNumber: str(raw.trackingNumber),
+        description:    str(raw.description),
+        published:      typeof raw.published === 'boolean' ? raw.published : undefined,
+    };
 }

@@ -590,6 +590,45 @@ export async function fetchExternalResources(config: D4HConfig): Promise<Externa
     return { records, queriesRun, pages, warning };
 }
 
+// ─── Incidents (Activities → Incidents) ────────────────────────────────────────
+
+/** ISO timestamp for the start of the incidents sync window (30 days ago, UTC). */
+export function incidentsWindowStartsAfter(): string {
+    const d = new Date();
+    d.setUTCDate(d.getUTCDate() - 30);
+    return d.toISOString();
+}
+
+/**
+ * Incidents from the last month — GET /v3/{context}/{contextId}/incidents per swagger.
+ * Server-side filter: `starts_after` (activities starting after the window start).
+ * Includes ongoing incidents (`include_ongoing=true`) with no end date.
+ */
+export async function fetchIncidents(
+    config: D4HConfig,
+    options: { startsAfter?: string } = {},
+): Promise<BestEffortResult> {
+    const startsAfter = options.startsAfter ?? incidentsWindowStartsAfter();
+    try {
+        const r = await fetchAllPages(config, `${ctxPath(config)}/incidents`, {
+            extraQuery: {
+                starts_after:    startsAfter,
+                sort:            'startsAt',
+                order:           'desc',
+                include_ongoing: 'true',
+            },
+        });
+        return { records: r.records, pages: r.pages, reportedTotal: r.reportedTotal };
+    } catch (e) {
+        return {
+            records:       [],
+            pages:         0,
+            reportedTotal: null,
+            warning:       `Incidents fetch failed (${(e as Error).message}). Is the activities module enabled?`,
+        };
+    }
+}
+
 // ─── Writes (Phase: submit incident) ───────────────────────────────────────────
 //
 // Phase-0 CORS spike (2026-06-06, real OPTIONS from cloudtak.example.org) confirmed

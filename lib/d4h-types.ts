@@ -58,6 +58,18 @@ export interface D4HExternalResource {
     name: string;                     // D4H search `title`
 }
 
+/** Incident activity from GET /v3/{context}/{contextId}/incidents (last-month window). */
+export interface D4HIncident {
+    id:              number;
+    reference?:      string;
+    title:           string;          // D4H `referenceDescription`
+    startsAt?:       string;          // ISO
+    endsAt?:         string;          // ISO; absent when ongoing
+    trackingNumber?: string;
+    description?:    string;
+    published?:      boolean;
+}
+
 export interface D4HRosterMeta {
     fetchedAt:    string;             // ISO
     region:       string;
@@ -66,6 +78,7 @@ export interface D4HRosterMeta {
     memberCount:  number;
     equipmentCount: number;          // count AFTER the category filter (wanted categories only)
     externalResourceCount?: number;  // External Resource Tracker catalog size
+    incidentCount?:       number;   // incidents from the last-month sync window
     /** Every distinct equipment category D4H returned, with counts and whether the filter kept it. */
     equipmentCategories?: { title: string; count: number; included: boolean }[];
     /** Warnings collected during sync — e.g. "equipment endpoint returned 404". */
@@ -78,4 +91,6 @@ export interface D4HRoster {
     equipment: D4HEquipment[];
     /** External Resource Tracker agencies (Intelligence → Resources). */
     externalResources?: D4HExternalResource[];
+    /** Incidents starting in the last 30 days (GET /incidents?starts_after=…). */
+    incidents?: D4HIncident[];
 }

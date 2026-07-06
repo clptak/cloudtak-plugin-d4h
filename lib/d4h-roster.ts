@@ -16,13 +16,13 @@ import KV from '../../../src/base/kv.ts';
 import { liveQuery, type Observable } from 'dexie';
 import { db } from '../../../src/database.ts';
 
-import { fetchMembers, fetchEquipment, fetchEquipmentCategories, fetchEquipmentBrands, fetchEquipmentModels, fetchQualificationCatalog, fetchQualificationAwards, fetchExternalResources } from './d4h-client.ts';
-import { normalizeMember, normalizeEquipment, normalizeEquipmentCategory, normalizeEquipmentBrand, normalizeEquipmentModel, normalizeQualificationDef, normalizeQualificationAward } from './d4h-normalize.ts';
+import { fetchMembers, fetchEquipment, fetchEquipmentCategories, fetchEquipmentBrands, fetchEquipmentModels, fetchQualificationCatalog, fetchQualificationAwards, fetchExternalResources, fetchIncidents } from './d4h-client.ts';
+import { normalizeMember, normalizeEquipment, normalizeEquipmentCategory, normalizeEquipmentBrand, normalizeEquipmentModel, normalizeQualificationDef, normalizeQualificationAward, normalizeIncident } from './d4h-normalize.ts';
 import { categoryIsWanted, WANTED_CATEGORY_KEYWORDS } from './d4h-equipment-categories.ts';
 import { isOperationalEquipmentStatus } from './d4h-status.ts';
 import type { D4HConfig } from './d4h-config.ts';
 import type {
-    D4HMember, D4HEquipment, D4HQualification, D4HRoster, D4HRosterMeta, D4HExternalResource,
+    D4HMember, D4HEquipment, D4HQualification, D4HRoster, D4HRosterMeta, D4HExternalResource, D4HIncident,
 } from './d4h-types.ts';
 
 export const ROSTER_KEY = 'd4h:roster';
@@ -51,6 +51,7 @@ export interface SyncResult {
         equipment:          FetchStats;
         qualifications:     FetchStats;
         externalResources:  ExternalResourceFetchStats;
+        incidents:          FetchStats;
     };
 }
 
@@ -68,7 +69,7 @@ export async function syncNow(config: D4HConfig): Promise<SyncResult> {
             ok: false,
             error: `Members fetch failed: ${(e as Error).message}`,
             warnings,
-            stats: { members: EMPTY_STATS, equipment: EMPTY_STATS, qualifications: EMPTY_STATS, externalResources: EMPTY_EXT_STATS },
+            stats: { members: EMPTY_STATS, equipment: EMPTY_STATS, qualifications: EMPTY_STATS, externalResources: EMPTY_EXT_STATS, incidents: EMPTY_STATS },
         };
     }
 
@@ -239,6 +240,28 @@ export async function syncNow(config: D4HConfig): Promise<SyncResult> {
     if (extResp.warning) warnings.push(extResp.warning);
     const externalResources: D4HExternalResource[] = extResp.records;
 
+    // Incidents from the last 30 days — GET /incidents?starts_after=… (swagger).
+    const incResp = await fetchIncidents(config);
+    if (incResp.warning) warnings.push(incResp.warning);
+    const incidents: D4HIncident[] = [];
+    let droppedIncidents = 0;
+    for (const raw of incResp.records) {
+        const inc = normalizeIncident(raw);
+        if (inc) incidents.push(inc);
+        else droppedIncidents++;
+    }
+    if (droppedIncidents > 0) {
+        warnings.push(`Dropped ${droppedIncidents} incident record(s) missing id during normalize.`);
+    }
+    if (
+        incResp.reportedTotal != null &&
+        incResp.records.length < incResp.reportedTotal
+    ) {
+        warnings.push(
+            `Incident pagination short: fetched ${incResp.records.length} of ${incResp.reportedTotal} reported by D4H (paged ${incResp.pages} times).`,
+        );
+    }
+
     const stats = {
         members: {
             pages:         membersResp.pages,
@@ -260,6 +283,11 @@ export async function syncNow(config: D4HConfig): Promise<SyncResult> {
             pages:      extResp.pages,
             rawCount:   externalResources.length,
         },
+        incidents: {
+            pages:         incResp.pages,
+            rawCount:      incResp.records.length,
+            reportedTotal: incResp.reportedTotal,
+        },
     };
 
     const meta: D4HRosterMeta = {
@@ -270,10 +298,11 @@ export async function syncNow(config: D4HConfig): Promise<SyncResult> {
         memberCount:    members.length,
         equipmentCount: equipment.length,
         externalResourceCount: externalResources.length,
+        incidentCount:         incidents.length,
         equipmentCategories,
         warnings,
     };
-    const roster: D4HRoster = { meta, members, equipment, externalResources };
+    const roster: D4HRoster = { meta, members, equipment, externalResources, incidents };
 
     try {
         await KV.update(ROSTER_KEY, JSON.stringify(roster));
