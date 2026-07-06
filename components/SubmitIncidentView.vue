@@ -396,6 +396,7 @@
         >
             <div v-if='result.ok'>
                 Incident created — D4H id <strong>{{ result.id }}</strong>{{ result.reference ? ` (ref ${result.reference})` : '' }}.
+                Added to the Incidents list for this mission.
             </div>
             <div v-else>
                 <strong>Submit failed.</strong> {{ result.message }}
@@ -425,6 +426,8 @@ import {
 } from '../lib/d4h-client.ts';
 
 import { OVERLAY_FIELD_MAP } from '../lib/overlay-field-map.ts';
+import { incidentFromCreateResponse } from '../lib/d4h-normalize.ts';
+import { upsertCachedIncident } from '../lib/d4h-roster.ts';
 import {
     inspectAtPoint,
     debugAtPoint,
@@ -443,6 +446,10 @@ import { db } from '../../../src/database.ts';
 
 interface MissionRef { guid: string; name: string }
 interface PointPick  { id: string; label: string; lat: number; lon: number }
+
+const emit = defineEmits<{
+    'incident-created': [];
+}>();
 
 const config              = ref<D4HConfig | null>(null);
 const missions            = ref<MissionRef[]>([]);
@@ -752,6 +759,21 @@ async function onSubmit(): Promise<void> {
 
         const created = await createIncident(config.value, payload);
         const id = (created.id ?? created.activityId) as unknown;
+
+        const endsAtIso = localInputToUTC(form.endsAtLocal) ?? undefined;
+        const incident = incidentFromCreateResponse(created, {
+            title:       form.title.trim().slice(0, 100),
+            reference:   reference ?? undefined,
+            startsAt:    startsAtUTC.value,
+            endsAt:      endsAtIso,
+            description: form.description.trim() || undefined,
+            missionGuid: selectedMissionGuid.value,
+        });
+        if (incident) {
+            await upsertCachedIncident(incident);
+            emit('incident-created');
+        }
+
         result.value = { ok: true, id, reference };
     } catch (e) {
         const err = e as Error & { status?: number };

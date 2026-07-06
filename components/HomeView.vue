@@ -613,7 +613,7 @@
 
             <!-- Submit incident -->
             <div v-else-if='activeTab === "submit"'>
-                <SubmitIncidentView />
+                <SubmitIncidentView @incident-created='onIncidentCreated' />
             </div>
 
             <div
@@ -903,6 +903,10 @@ onUnmounted(() => {
 function statsLine(label: string, s: { pages: number; rawCount: number; reportedTotal: number | null }): string {
     const total = s.reportedTotal != null ? ` of ${s.reportedTotal} reported` : '';
     return `${label}: ${s.rawCount}${total} across ${s.pages} page${s.pages === 1 ? '' : 's'}`;
+}
+
+async function onIncidentCreated(): Promise<void> {
+    roster.value = await loadCachedRoster();
 }
 
 async function onSync(): Promise<void> {

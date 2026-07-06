@@ -241,14 +241,29 @@ export async function syncNow(config: D4HConfig): Promise<SyncResult> {
     const externalResources: D4HExternalResource[] = extResp.records;
 
     // Incidents from the last 30 days — GET /incidents?starts_after=… (swagger).
+    const prevRoster = await loadCachedRoster();
+    const missionGuidById = new Map(
+        (prevRoster?.incidents ?? [])
+            .filter(i => i.missionGuid)
+            .map(i => [i.id, i.missionGuid!]),
+    );
+
     const incResp = await fetchIncidents(config);
     if (incResp.warning) warnings.push(incResp.warning);
     const incidents: D4HIncident[] = [];
     let droppedIncidents = 0;
     for (const raw of incResp.records) {
         const inc = normalizeIncident(raw);
-        if (inc) incidents.push(inc);
-        else droppedIncidents++;
+        if (inc) {
+            const missionGuid = missionGuidById.get(inc.id);
+            if (missionGuid) inc.missionGuid = missionGuid;
+            incidents.push(inc);
+        } else droppedIncidents++;
+    }
+    // Keep plugin-submitted incidents until D4H returns them on the next fetch.
+    const fetchedIds = new Set(incidents.map(i => i.id));
+    for (const prev of prevRoster?.incidents ?? []) {
+        if (prev.missionGuid && !fetchedIds.has(prev.id)) incidents.unshift(prev);
     }
     if (droppedIncidents > 0) {
         warnings.push(`Dropped ${droppedIncidents} incident record(s) missing id during normalize.`);
@@ -335,6 +350,44 @@ export async function loadCachedMeta(): Promise<D4HRosterMeta | null> {
 export async function clearCachedRoster(): Promise<void> {
     try { await KV.delete(ROSTER_KEY); } catch { /* ignore */ }
     try { await KV.delete(META_KEY);   } catch { /* ignore */ }
+}
+
+/**
+ * Insert or replace one incident in the cached roster (e.g. after Submit Incident).
+ * New rows are prepended so the latest activity is easy to find before the next full sync.
+ */
+export async function upsertCachedIncident(incident: D4HIncident): Promise<D4HRoster | null> {
+    const existing = await loadCachedRoster();
+    const roster: D4HRoster = existing ?? {
+        meta: {
+            fetchedAt:      new Date().toISOString(),
+            region:         '',
+            context:        '',
+            contextId:      0,
+            memberCount:    0,
+            equipmentCount: 0,
+            warnings:       [],
+        },
+        members:   [],
+        equipment: [],
+        incidents: [],
+    };
+
+    const incidents = [...(roster.incidents ?? [])];
+    const idx = incidents.findIndex(i => i.id === incident.id);
+    if (idx >= 0) incidents[idx] = { ...incidents[idx], ...incident };
+    else incidents.unshift(incident);
+
+    roster.incidents = incidents;
+    roster.meta = { ...roster.meta, incidentCount: incidents.length };
+
+    try {
+        await KV.update(ROSTER_KEY, JSON.stringify(roster));
+        await KV.update(META_KEY,   JSON.stringify(roster.meta));
+    } catch {
+        return null;
+    }
+    return roster;
 }
 
 /**

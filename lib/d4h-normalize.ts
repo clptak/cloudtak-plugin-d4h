@@ -197,6 +197,25 @@ export function normalizeQualificationAward(
     return { id, memberId, qualId, expiresAt };
 }
 
+/**
+ * Build a roster incident row from a POST /incidents response (uses `activityId` when `id` absent).
+ * Optional `seed` fills gaps from the submit form (title, times, mission link).
+ */
+export function incidentFromCreateResponse(
+    created: Record<string, unknown>,
+    seed?: Partial<D4HIncident>,
+): D4HIncident | null {
+    const activityId = num(created.activityId);
+    const withId = created.id != null
+        ? created
+        : activityId != null
+            ? { ...created, id: activityId }
+            : created;
+    const normalized = normalizeIncident(withId as Json);
+    if (!normalized) return null;
+    return { ...normalized, ...seed };
+}
+
 /** Incident list row from GET /incidents (swagger example shape). */
 export function normalizeIncident(raw: Json): D4HIncident | null {
     const id = num(raw.id);

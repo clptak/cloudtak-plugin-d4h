@@ -68,6 +68,8 @@ export interface D4HIncident {
     trackingNumber?: string;
     description?:    string;
     published?:      boolean;
+    /** DataSync mission GUID when the incident was submitted from this plugin. */
+    missionGuid?:    string;
 }
 
 export interface D4HRosterMeta {
