@@ -105,20 +105,56 @@
                 </ul>
             </div>
 
-            <div class='d-flex border-bottom mb-3 flex-shrink-0'>
+            <div
+                class='d-flex border-bottom flex-shrink-0'
+                :class='activeMainTab === "incidents" ? "mb-3" : "mb-0"'
+            >
                 <button
-                    v-for='tab in rosterTabs'
+                    v-for='tab in mainTabs'
                     :key='tab.key'
+                    type='button'
                     class='flex-fill btn btn-sm rounded-0 py-2 border-0'
-                    :class='activeTab === tab.key ? "bg-primary text-white fw-semibold" : "text-muted"'
-                    @click='activeTab = tab.key'
+                    :class='activeMainTab === tab.key ? "bg-primary text-white fw-semibold" : "text-muted"'
+                    @click='activeMainTab = tab.key'
+                >
+                    {{ tab.label }}
+                </button>
+            </div>
+
+            <div
+                v-if='activeMainTab === "resources"'
+                class='d-flex flex-wrap gap-1 mb-3 mt-2 flex-shrink-0'
+            >
+                <button
+                    v-for='tab in resourcesSubTabs'
+                    :key='tab.key'
+                    type='button'
+                    class='btn btn-sm btn-outline-warning'
+                    :class='{ active: resourcesSubTab === tab.key }'
+                    @click='resourcesSubTab = tab.key'
+                >
+                    {{ tab.label }}
+                </button>
+            </div>
+
+            <div
+                v-else-if='activeMainTab === "submit-d4h"'
+                class='d-flex flex-wrap gap-1 mb-3 mt-2 flex-shrink-0'
+            >
+                <button
+                    v-for='tab in submitSubTabs'
+                    :key='tab.key'
+                    type='button'
+                    class='btn btn-sm btn-outline-warning'
+                    :class='{ active: submitSubTab === tab.key }'
+                    @click='submitSubTab = tab.key'
                 >
                     {{ tab.label }}
                 </button>
             </div>
 
             <!-- Personnel -->
-            <div v-if='activeTab === "personnel"'>
+            <div v-if='activeContentKey === "personnel"'>
                 <div
                     v-if='roster?.members?.length'
                     class='card mb-3'
@@ -259,7 +295,7 @@
             </div>
 
             <!-- Equipment -->
-            <div v-else-if='activeTab === "equipment"'>
+            <div v-else-if='activeContentKey === "equipment"'>
                 <div
                     v-if='roster?.equipment?.length || meta?.equipmentCategories?.length'
                     class='card mb-3'
@@ -280,22 +316,19 @@
                         >
                     </div>
 
-                    <!-- Discovered categories — green = kept by the vehicles/UAS/tech-litter filter.
-                     If the ones you want aren't green, the label differs; tweak
-                     WANTED_CATEGORY_KEYWORDS in lib/d4h-equipment-categories.ts. -->
-                    <div
-                        v-if='meta?.equipmentCategories?.length'
-                        class='px-2 py-1 small border-bottom d-flex flex-wrap gap-1 align-items-center'
-                    >
-                        <span class='text-muted me-1'>Categories found:</span>
-                        <span
-                            v-for='c in meta.equipmentCategories'
-                            :key='c.title'
-                            class='badge'
-                            :class='c.included ? "bg-success" : "bg-light text-muted border"'
-                            :title='c.included ? "Kept by the vehicles / UAS / tech-litter filter" : "Not in the wanted categories"'
-                        >{{ c.title }} ({{ c.count }})</span>
-                    </div>
+                        <div
+                            v-if='meta?.equipmentCategories?.length'
+                            class='px-2 py-1 small border-bottom d-flex flex-wrap gap-1 align-items-center'
+                        >
+                            <span class='text-muted me-1'>Categories found:</span>
+                            <span
+                                v-for='c in meta.equipmentCategories'
+                                :key='c.title'
+                                class='badge'
+                                :class='c.included ? "bg-success text-white" : "bg-secondary text-white text-decoration-line-through"'
+                                :title='c.included ? "Kept by the vehicles / UAS / tech-litter filter" : "Not in the wanted categories"'
+                            >{{ c.title }} ({{ c.count }})</span>
+                        </div>
                     <div
                         class='table-responsive'
                         style='max-height:50vh;overflow:auto'
@@ -395,7 +428,7 @@
             </div>
 
             <!-- External resources (Intelligence → Resources) -->
-            <div v-else-if='activeTab === "resources"'>
+            <div v-else-if='activeContentKey === "resources"'>
                 <div
                     v-if='roster?.externalResources?.length'
                     class='card mb-3'
@@ -475,7 +508,7 @@
             </div>
 
             <!-- Incidents (last 30 days) -->
-            <div v-else-if='activeTab === "incidents"'>
+            <div v-else-if='activeContentKey === "incidents"'>
                 <div
                     v-if='roster?.incidents?.length'
                     class='card mb-3'
@@ -612,17 +645,17 @@
             </div>
 
             <!-- Submit incident -->
-            <div v-else-if='activeTab === "submit"'>
+            <div v-else-if='activeContentKey === "submit"'>
                 <SubmitIncidentView @incident-created='onIncidentCreated' />
             </div>
 
             <!-- Submit roster -->
-            <div v-else-if='activeTab === "submit-roster"'>
+            <div v-else-if='activeContentKey === "submit-roster"'>
                 <SubmitRosterView :roster='roster' />
             </div>
 
             <!-- Submit subject -->
-            <div v-else-if='activeTab === "submit-subject"'>
+            <div v-else-if='activeContentKey === "submit-subject"'>
                 <SubmitSubjectView :roster='roster' />
             </div>
 
@@ -678,10 +711,28 @@ const incidentSortDir = ref<'asc' | 'desc'>('desc');
 const syncStatus = ref<{ kind: 'ok' | 'err' | 'info'; title: string; detail?: string } | null>(null);
 const warningsDismissed = ref(false);
 
-type RosterTabKey = 'personnel' | 'equipment' | 'resources' | 'incidents' | 'submit' | 'submit-roster' | 'submit-subject';
-const activeTab = ref<RosterTabKey>('personnel');
+type MainTabKey = 'resources' | 'incidents' | 'submit-d4h';
+type ResourcesSubKey = 'personnel' | 'equipment' | 'resources';
+type SubmitSubKey = 'submit' | 'submit-roster' | 'submit-subject';
+type ContentTabKey = ResourcesSubKey | 'incidents' | SubmitSubKey;
 
-const rosterTabs = computed(() => [
+const activeMainTab = ref<MainTabKey>('resources');
+const resourcesSubTab = ref<ResourcesSubKey>('personnel');
+const submitSubTab = ref<SubmitSubKey>('submit');
+
+const activeContentKey = computed<ContentTabKey>(() => {
+    if (activeMainTab.value === 'incidents') return 'incidents';
+    if (activeMainTab.value === 'resources') return resourcesSubTab.value;
+    return submitSubTab.value;
+});
+
+const mainTabs = computed(() => [
+    { key: 'resources' as const, label: 'Resources' },
+    { key: 'incidents' as const, label: 'Incidents' },
+    { key: 'submit-d4h' as const, label: 'Submit to D4H' },
+]);
+
+const resourcesSubTabs = computed(() => [
     {
         key:   'personnel' as const,
         label: `Personnel (${meta.value?.memberCount ?? roster.value?.members.length ?? 0})`,
@@ -694,22 +745,12 @@ const rosterTabs = computed(() => [
         key:   'resources' as const,
         label: `Resources (${meta.value?.externalResourceCount ?? roster.value?.externalResources?.length ?? 0})`,
     },
-    {
-        key:   'incidents' as const,
-        label: `Incidents (${meta.value?.incidentCount ?? roster.value?.incidents?.length ?? 0})`,
-    },
-    {
-        key:   'submit' as const,
-        label: 'Submit Incident',
-    },
-    {
-        key:   'submit-roster' as const,
-        label: 'Submit Roster',
-    },
-    {
-        key:   'submit-subject' as const,
-        label: 'Submit Subject',
-    },
+]);
+
+const submitSubTabs = computed(() => [
+    { key: 'submit' as const, label: 'Submit Incident' },
+    { key: 'submit-roster' as const, label: 'Submit Roster' },
+    { key: 'submit-subject' as const, label: 'Submit Subject' },
 ]);
 
 const hasConfig = computed(() => !!config.value);
