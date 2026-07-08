@@ -316,19 +316,19 @@
                         >
                     </div>
 
-                        <div
-                            v-if='meta?.equipmentCategories?.length'
-                            class='px-2 py-1 small border-bottom d-flex flex-wrap gap-1 align-items-center'
-                        >
-                            <span class='text-muted me-1'>Categories found:</span>
-                            <span
-                                v-for='c in meta.equipmentCategories'
-                                :key='c.title'
-                                class='badge'
-                                :class='c.included ? "bg-success text-white" : "bg-secondary text-white text-decoration-line-through"'
-                                :title='c.included ? "Kept by the vehicles / UAS / tech-litter filter" : "Not in the wanted categories"'
-                            >{{ c.title }} ({{ c.count }})</span>
-                        </div>
+                    <div
+                        v-if='meta?.equipmentCategories?.length'
+                        class='px-2 py-1 small border-bottom d-flex flex-wrap gap-1 align-items-center'
+                    >
+                        <span class='text-muted me-1'>Categories found:</span>
+                        <span
+                            v-for='c in meta.equipmentCategories'
+                            :key='c.title'
+                            class='badge'
+                            :class='c.included ? "bg-success text-white" : "bg-secondary text-white text-decoration-line-through"'
+                            :title='c.included ? "Kept by the vehicles / UAS / tech-litter filter" : "Not in the wanted categories"'
+                        >{{ c.title }} ({{ c.count }})</span>
+                    </div>
                     <div
                         class='table-responsive'
                         style='max-height:50vh;overflow:auto'
