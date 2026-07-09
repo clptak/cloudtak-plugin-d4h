@@ -1,12 +1,17 @@
 <template>
-    <div class='d-flex flex-column h-100 overflow-hidden'>
-        <div class='d-flex align-items-center px-3 py-2 border-bottom flex-shrink-0 gap-2'>
+    <MenuTemplate
+        name='D4H'
+        :loading='!loaded'
+    >
+        <template #header>
             <D4HIcon :size='22' />
-            <span class='fw-semibold'>D4H</span>
-            <span class='text-muted ms-auto small'>
+            <span class='fw-semibold ms-2'>D4H</span>
+        </template>
+        <template #buttons>
+            <span class='text-muted small'>
                 {{ loaded ? (hasConfig ? statusBadge : 'Not configured') : 'Loading…' }}
             </span>
-        </div>
+        </template>
 
         <!-- Config UI when nothing saved -->
         <ConfigView
@@ -17,7 +22,7 @@
         <!-- Roster pane -->
         <div
             v-else-if='loaded && hasConfig'
-            class='flex-grow-1 overflow-auto p-3'
+            class='p-3'
         >
             <div class='d-flex align-items-center gap-2 flex-wrap mb-3'>
                 <button
@@ -174,10 +179,7 @@
                             placeholder='Filter by name, badge, position, mobile…'
                         >
                     </div>
-                    <div
-                        class='table-responsive'
-                        style='max-height:50vh;overflow:auto'
-                    >
+                    <div class='table-responsive'>
                         <table class='table table-sm table-hover mb-0 small'>
                             <thead class='sticky-top bg-body'>
                                 <tr>
@@ -329,10 +331,7 @@
                             :title='c.included ? "Kept by the vehicles / UAS / tech-litter filter" : "Not in the wanted categories"'
                         >{{ c.title }} ({{ c.count }})</span>
                     </div>
-                    <div
-                        class='table-responsive'
-                        style='max-height:50vh;overflow:auto'
-                    >
+                    <div class='table-responsive'>
                         <table class='table table-sm table-hover mb-0 small'>
                             <thead class='sticky-top bg-body'>
                                 <tr>
@@ -448,10 +447,7 @@
                             placeholder='Filter by id or agency name…'
                         >
                     </div>
-                    <div
-                        class='table-responsive'
-                        style='max-height:50vh;overflow:auto'
-                    >
+                    <div class='table-responsive'>
                         <table class='table table-sm table-hover mb-0 small'>
                             <thead class='sticky-top bg-body'>
                                 <tr>
@@ -528,10 +524,7 @@
                             placeholder='Filter by ref, title, tracking #…'
                         >
                     </div>
-                    <div
-                        class='table-responsive'
-                        style='max-height:50vh;overflow:auto'
-                    >
+                    <div class='table-responsive'>
                         <table class='table table-sm table-hover mb-0 small'>
                             <thead class='sticky-top bg-body'>
                                 <tr>
@@ -669,18 +662,12 @@
                 />
             </div>
         </div>
-
-        <div
-            v-else
-            class='flex-grow-1 d-flex align-items-center justify-content-center text-muted small'
-        >
-            Loading…
-        </div>
-    </div>
+    </MenuTemplate>
 </template>
 
 <script setup lang='ts'>
 import { computed, onMounted, onUnmounted, ref } from 'vue';
+import MenuTemplate from '../lib/MenuTemplate.vue';
 import ConfigView from './ConfigView.vue';
 import SubmitIncidentView from './SubmitIncidentView.vue';
 import SubmitRosterView from './SubmitRosterView.vue';

@@ -1,5 +1,5 @@
 <template>
-    <div class='d-flex flex-column h-100 overflow-auto p-3'>
+    <div class='d-flex flex-column p-3'>
         <h5 class='mb-3'>
             D4H connection
         </h5>

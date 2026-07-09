@@ -1,5 +1,5 @@
 <template>
-    <div class='d-flex flex-column h-100 overflow-auto'>
+    <div class='d-flex flex-column'>
         <h5 class='mb-3'>
             Submit subject to D4H
         </h5>

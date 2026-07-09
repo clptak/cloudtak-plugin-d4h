@@ -1,5 +1,5 @@
 <template>
-    <div class='d-flex flex-column h-100 overflow-auto p-3'>
+    <div class='d-flex flex-column p-3'>
         <h5 class='mb-3'>
             Submit incident to D4H
         </h5>
@@ -106,7 +106,6 @@
                 <div
                     v-if='inspectResults'
                     class='border rounded p-2 mt-1 small'
-                    style='max-height:30vh;overflow:auto'
                 >
                     <div v-if='!inspectResults.length'>
                         <div class='text-muted mb-1'>
