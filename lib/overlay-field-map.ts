@@ -1,4 +1,4 @@
-// Static overlay → incident-custom-field mapping (Paul-authored).
+// Static overlay → incident-custom-field mapping template.
 //
 // Each row tells the Submit Incident tab: "at the incident's CoT point, read property
 // `attribute` from the overlay layer `overlayLayerId`, and write it into D4H incident
@@ -37,7 +37,7 @@ export interface OverlayFieldMapping {
     /**
      * Optional translation from the overlay's attribute value → the D4H value/option label.
      * Use when the overlay's wording differs from D4H's, e.g.
-     *   { 'Red Rock Ranger District': 'USFS COCONINO-RED ROCK RANGER DISTRICT' }
+     *   { 'District A': 'AGENCY DISTRICT A' }
      * Keys are matched case-insensitively and whitespace-normalized. Unlisted values pass through.
      */
     valueMap?: Record<string, string>;
@@ -47,116 +47,33 @@ export interface OverlayFieldMapping {
 
 export const OVERLAY_FIELD_MAP: OverlayFieldMapping[] = [
     // --- Examples (commented). Replace with real ids/keys discovered via "Inspect overlays". ---
-    // { customFieldId: 1001, overlayLayerId: '57-fill', attribute: 'DISTRICT_NAME', note: 'BOS District' },
-    // { customFieldId: 1002, overlayLayerId: '61-fill', attribute: 'LMU_NAME',      note: 'Land Mgmt District' },
-    // { customFieldId: 1003, overlayLayerId: '63-fill', attribute: 'WILDERNESS',    note: 'Wilderness Incursion' },
-    {
-        customFieldId: 8032, // TODO: replace with the real D4H "Land Management" field id (#id shown in the tab)
-        overlayLayerId: 'ranger-poly',
-        attribute: 'districtorgcode',
-        note: 'Land Management District',
-        valueMap: {
-            // overlay value (districtname)        : D4H option label (must match exactly after normalize)
-            '030406': 'USFS COCONINO-RED ROCK RANGER DISTRICT',
-            '030701': 'USFS KAIBAB-WILLIAMS RANGER DISTRICT',
-            '030704': 'USFS KAIBAB-TUSAYAN RANGER DISTRICT',
-            '030703': 'USFS KAIBAB-NORTH KAIBAB RANGER DISTRICT',
-            '030408': 'USFS COCONINO-FLAGSTAFF RANGER DISTRICT',
-            '030407': 'USFS COCONINO-MOGOLLON RIM RANGER DISTRICT',
-            '030102': 'USFS A-S - BLACK MESA RANGER DISTRICT',
-            '030905': 'USFS PRESCOTT - VERDE RANGER DISTRICT',
-            '030901': 'USFS PRESCOTT - CHINO VALLEY RANGER DISTRICT',
-            // add the rest of your districts here, e.g.:
-            // 'Mogollon Rim Ranger District': 'USFS COCONINO-MOGOLLON RIM RANGER DISTRICT',
-        },
-    },
-    {
-        customFieldId: 1485,
-        overlayLayerId: 'landowner-poly',
-        attribute: 'OWNERORMANAGINGAGENCY',
-        note: 'Land Owner or Managing Agency',
-        valueMap: {
-            // overlay value (Land Owner or Managing Agency)        : D4H option label (must match exactly after normalize)
-            'Apache-Sitgreaves National Forests': 'USFS',
-            'Coconino National Forest': 'USFS',
-            'Kaibab National Forest': 'USFS',
-            'Grand Canyon National Park': 'NPS',
-            'Sunset Crater National Monument': 'NPS',
-            'Walnut Canyon National Monument': 'NPS',
-            'Vermilion Cliffs National Monument': 'BLM',
-            'Bureau of Land Management': 'BLM',
-            'Baaj Nwaavjo Itah Kukveni National Monument': 'BLM',
-            'Glen Canyon National Recreation Area': 'NPS',
-            'City of Page': 'MUNICIPAL',
-            'City of Flagstaff': 'MUNICIPAL',
-            'City of Williams': 'MUNICIPAL',
-            'City of Sedona': 'MUNICIPAL',
-            'Navajo Nation': 'TRIBAL',
-            'Hopi Tribal Land': 'TRIBAL',
-            'Hualapai Tribal Land': 'TRIBAL',
-            'Havasupai Tribal Land': 'TRIBAL',
-            'Private': 'PRIVATE',
-            'State Trust': 'STATE',
-        },
-    },
-    {
-        customFieldId: 8033, // TODO: replace with the real D4H "Wilderness" field id (#id shown in the tab)
-        overlayLayerId: '38-polyline1',
-        attribute: 'OBJECTID',
-        note: 'Supervisor District',
-        valueMap: {
-            '1': 'DISTRICT 1',
-        },
-    },
-    {
-        customFieldId: 8033, // TODO: replace with the real D4H "Wilderness" field id (#id shown in the tab)
-        overlayLayerId: '38-polyline2',
-        attribute: 'OBJECTID',
-        note: 'Supervisor District',
-        valueMap: {
-            '2': 'DISTRICT 2',
-        },
-    },
-    {
-        customFieldId: 8033, // TODO: replace with the real D4H "Wilderness" field id (#id shown in the tab)
-        overlayLayerId: '38-polyline3',
-        attribute: 'OBJECTID',
-        note: 'Supervisor District',
-        valueMap: {
-            '3': 'DISTRICT 3',
-        },
-    },
-    {
-        customFieldId: 8033, // TODO: replace with the real D4H "Wilderness" field id (#id shown in the tab)
-        overlayLayerId: '38-polyline4',
-        attribute: 'OBJECTID',
-        note: 'Supervisor District',
-        valueMap: {
-            '4': 'DISTRICT 4',        },
-    },
-    {
-        customFieldId: 8033, // TODO: replace with the real D4H "Wilderness" field id (#id shown in the tab)
-        overlayLayerId: '38-polyline5',
-        attribute: 'OBJECTID',
-        note: 'Supervisor District',
-        valueMap: {
-            // overlay value (OBJECTID)        : D4H option label (must match exactly after normalize)
-            '5': 'DISTRICT 5',
-        },
-    },
-    {
-        customFieldId: 1483, // WILDERNESS AREA NAME (TEXT field — value passes through as-is)
-        overlayLayerId: 'wilderness-poly',
-        attribute: 'NAME', // this layer uses `wildernessname`; the lowercase `wilderness-poly` uses `NAME`
-        note: 'Wilderness Area Name',
-    },
-
-    // Wilderness — the D4H field is TEXT, so NO valueMap is needed: the raw overlay
-    // attribute value is written into the field as-is. Fill in the three values and uncomment.
+  //
+    // SINGLE_CHOICE with valueMap — overlay label differs from D4H option label:
     // {
-    //     customFieldId: 0,                 // <- the Wilderness D4H TEXT field's #id (shown in the tab)
-    //     overlayLayerId: 'REPLACE-poly',   // <- from "Inspect overlays at point"
-    //     attribute: 'REPLACE',             // <- the property key holding the wilderness name
-    //     note: 'Wilderness Incursion',
+    //     customFieldId: 1001,
+    //     overlayLayerId: '57-fill',
+    //     attribute: 'DISTRICT_NAME',
+    //     note: 'Supervisor district',
+    //     valueMap: {
+    //         'District A': 'AGENCY DISTRICT A',
+    //         'District B': 'AGENCY DISTRICT B',
+    //     },
+    // },
+    //
+    // TEXT field — no valueMap; raw overlay value passes through:
+    // {
+    //     customFieldId: 1002,
+    //     overlayLayerId: 'wilderness-poly',
+    //     attribute: 'NAME',
+    //     note: 'Wilderness area name',
+    // },
+    //
+    // Multiple layers mapping to the same D4H field (e.g. one polyline per district):
+    // {
+    //     customFieldId: 1003,
+    //     overlayLayerId: '38-polyline1',
+    //     attribute: 'OBJECTID',
+    //     note: 'Supervisor district',
+    //     valueMap: { '1': 'DISTRICT 1' },
     // },
 ];

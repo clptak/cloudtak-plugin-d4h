@@ -275,12 +275,12 @@ one (the `Wilderness-poly`/`wildernessname` vs `wilderness-poly`/`NAME` trap).
 ## Optional — translate the overlay value before storing it
 
 If your form needs a different string than the overlay carries (e.g. the overlay says
-`Red Rock Ranger District` but your record needs `USFS COCONINO-RED ROCK RANGER DISTRICT`), add a small
+`District A` but your record needs `AGENCY DISTRICT A`), add a small
 lookup before assigning:
 
 ```ts
 const VALUE_MAP: Record<string, string> = {
-    'Red Rock Ranger District': 'USFS COCONINO-RED ROCK RANGER DISTRICT',
+    'District A': 'AGENCY DISTRICT A',
 };
 const norm = (s: string) => s.toLowerCase().trim().replace(/\s+/g, ' ');
 function translate(v: string): string {

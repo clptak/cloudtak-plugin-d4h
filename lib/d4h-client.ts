@@ -732,7 +732,7 @@ export interface MemberGroupOption {
 
 /**
  * Peek the next available auto-id reference WITHOUT consuming it.
- * Team has auto-id enabled (confirmed with Paul), so the create payload should carry
+ * Team has auto-id enabled, so the create payload should carry
  * a reference. `peek` has no side effect. Team-scoped endpoint.
  *
  * The v3 response shape isn't documented in the swagger; we parse defensively and

@@ -19,7 +19,7 @@ POST https://api.team-manager.us.d4h.com/v3/team/<contextId>/incidents
 
 ---
 
-## Decisions locked in (from Paul, 2026-06-06)
+## Decisions locked in (2026-06-06)
 
 | Topic | Decision |
 |-------|----------|
@@ -234,7 +234,7 @@ fields. Confirmed feasible: overlays are `vector`/`geojson` with attribute popup
 `map.queryRenderedFeatures` returns their `properties` (CloudTAK's own click handler uses the same
 call). Raster overlays would need ArcGIS REST identify — out of scope.
 
-- **Mapping**: static, Paul-authored `lib/overlay-field-map.ts` —
+- **Mapping**: static `lib/overlay-field-map.ts` template —
   `{ customFieldId, overlayLayerId, attribute }[]` (explicit, per the chosen approach). Ships empty
   with commented examples.
 - **`lib/overlay-detect.ts`**: `inspectAtPoint()` (dumps every clickable overlay feature's layer id +
