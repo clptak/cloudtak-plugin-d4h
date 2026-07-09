@@ -1,17 +1,17 @@
 // Raw D4H record → normalized plugin shape.
 //
-// Source shapes (observed in Phase 0 spike against /v3/team/12345/members):
+// Source shapes (observed in Phase 0 spike against /v3/team/<contextId>/members):
 //   {
-//     id: 19397,
-//     ref: "629",
-//     name: "Example, Member ",
-//     position: "Retired at own Request",
+//     id: 12345,
+//     ref: "001",
+//     name: "Example, Member",
+//     position: "Responder",
 //     status: "RETIRED",
 //     email:  { value: "...", verified: false },
 //     mobile: { phone: "...", verified: false },
 //     home:   { phone: "", verified: false },
 //     work:   { phone: "" },
-//     owner:  { id: 12345, resourceType: "Team" },
+//     owner:  { id: 999, resourceType: "Team" },
 //     customFieldValues: [ { customField: {...}, value: "..." } ],
 //     // ...lots more
 //   }

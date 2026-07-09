@@ -631,7 +631,7 @@ export async function fetchIncidents(
 
 // ─── Writes (Phase: submit incident) ───────────────────────────────────────────
 //
-// Phase-0 CORS spike (2026-06-06, real OPTIONS from cloudtak.example.org) confirmed
+// Phase-0 CORS spike (2026-06-06, real OPTIONS from your CloudTAK origin) confirmed
 // D4H returns `Access-Control-Allow-Origin: *` and
 // `Access-Control-Allow-Methods: GET,HEAD,PUT,PATCH,POST,DELETE` with
 // `Access-Control-Allow-Headers: authorization,content-type`. So browser writes are

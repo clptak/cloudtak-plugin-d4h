@@ -86,7 +86,7 @@ These facts drive every recommendation below.
     `/v3/{context}/{contextId}/member-qualifications` or `…/qualification-awards`. **[verify]**
   - Equipment: `GET /v3/{context}/{contextId}/equipment`. **[verify]**
 - **Pagination & envelope:** D4H v3 wraps results in `{ results: [...] }` — **confirmed**
-  by the Phase 0 spike against `/v3/team/12345/members`. Pagination cursor field names still
+  by the Phase 0 spike against `/v3/team/<contextId>/members`. Pagination cursor field names still
   need confirming on a multi-page response (likely `page`, `size`, `totalSize` or a `next`
   cursor) — **[verify]** by paging beyond the first response.
 
@@ -240,7 +240,7 @@ one. Use a local Pinia store *inside* the D4H plugin for its own UI state if hel
 
 **Phase 0 — CORS spike — ✅ DONE (2026-06-05).**
 Confirmed client-side direct works: preflight returns `Allow-Origin: *` and a real
-browser `GET /v3/team/12345/members` with a Bearer token returned HTTP 200 with a
+browser `GET /v3/team/<contextId>/members` with a Bearer token returned HTTP 200 with a
 `{ results: [...] }` envelope. Spike artifacts live at `spike/phase-0-cors/`.
 
 **Phase 1 — Plugin scaffold.**

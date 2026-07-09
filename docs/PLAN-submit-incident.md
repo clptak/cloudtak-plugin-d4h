@@ -12,10 +12,10 @@ A new tab that reads the active DataSync mission, lets the user assemble an inci
 CoT points, and `POST`s it to D4H:
 
 ```
-POST https://api.team-manager.us.d4h.com/v3/team/12345/incidents
+POST https://api.team-manager.us.d4h.com/v3/team/<contextId>/incidents
 ```
 
-(Context = `team`, contextId = `12345`, from `d4h-config-v1`.)
+(Context = `team`, contextId = `<contextId>`, from `d4h-config-v1`.)
 
 ---
 
@@ -69,8 +69,8 @@ step (see Phase 4); it does not affect the incident body.
 
 ```
 0. (one-time spike)  Confirm CORS allows POST from the browser.
-1. POST /v3/team/12345/incidents/reference/peek   → next auto-id reference
-2. POST /v3/team/12345/incidents                  → returns the new activityId
+1. POST /v3/team/<contextId>/incidents/reference/peek   → next auto-id reference
+2. POST /v3/team/<contextId>/incidents                  → returns the new activityId
    (fullTeam=true auto-creates attendance for the whole team)
 ```
 
@@ -177,7 +177,7 @@ authenticates.
 
 Open auth caveat: the spike's real GET returned **HTTP 401** (token didn't authenticate — separate
 from CORS). Before live submits, confirm a valid, **write-scoped** token in `d4h-config-v1` and that
-`12345` is the right team id.
+`<contextId>` is the right team id.
 
 ## Client additions — DONE (scaffolded 2026-06-06)
 
@@ -268,7 +268,7 @@ upgrading the native multi-selects to a richer Vue component.
 ## Future phases (explicitly out of scope for v1)
 
 - **Phase: selective attendance.** When `fullTeam=false`, resolve members of the selected
-  group(s) via `/member-group-memberships`, then `POST /v3/team/12345/attendance` per member
+  group(s) via `/member-group-memberships`, then `POST /v3/team/<contextId>/attendance` per member
   (`memberId`, `activityId`, `startsAt`, `endsAt`, `status:"ATTENDING"`).
 - **Phase: custom fields.** `GET /custom-fields` (filter to the incident resource type — the
   `target_resource_type` value is **not** in the swagger, discover it live) + `/custom-field-options`;
