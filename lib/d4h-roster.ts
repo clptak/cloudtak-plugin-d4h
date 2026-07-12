@@ -16,7 +16,7 @@ import KV from '../../../src/base/kv.ts';
 import { liveQuery, type Observable } from 'dexie';
 import { db } from '../../../src/database.ts';
 
-import { fetchMembers, fetchEquipment, fetchEquipmentCategories, fetchEquipmentBrands, fetchEquipmentModels, fetchQualificationCatalog, fetchQualificationAwards, fetchExternalResources, fetchIncidents } from './d4h-client.ts';
+import { fetchMembers, fetchEquipment, fetchEquipmentCategories, fetchEquipmentBrands, fetchEquipmentModels, fetchQualificationCatalog, fetchQualificationAwards, fetchExternalResources, fetchIncidents, fetchContextName } from './d4h-client.ts';
 import { normalizeMember, normalizeEquipment, normalizeEquipmentCategory, normalizeEquipmentBrand, normalizeEquipmentModel, normalizeQualificationDef, normalizeQualificationAward, normalizeIncident } from './d4h-normalize.ts';
 import { categoryIsWanted, WANTED_CATEGORY_KEYWORDS } from './d4h-equipment-categories.ts';
 import { isOperationalEquipmentStatus } from './d4h-status.ts';
@@ -277,6 +277,11 @@ export async function syncNow(config: D4HConfig): Promise<SyncResult> {
         );
     }
 
+    const contextName = await fetchContextName(config);
+    if (!contextName) {
+        warnings.push('Could not fetch team/organization display name from D4H.');
+    }
+
     const stats = {
         members: {
             pages:         membersResp.pages,
@@ -310,6 +315,7 @@ export async function syncNow(config: D4HConfig): Promise<SyncResult> {
         region:         config.region,
         context:        config.context,
         contextId:      config.contextId,
+        contextName:    contextName ?? undefined,
         memberCount:    members.length,
         equipmentCount: equipment.length,
         externalResourceCount: externalResources.length,

@@ -77,6 +77,8 @@ export interface D4HRosterMeta {
     region:       string;
     context:      string;             // "team" | "organization"
     contextId:    number;
+    /** Team/org display name from GET /v3/{context}/{contextId} → title. */
+    contextName?: string;
     memberCount:  number;
     equipmentCount: number;          // count AFTER the category filter (wanted categories only)
     externalResourceCount?: number;  // External Resource Tracker catalog size

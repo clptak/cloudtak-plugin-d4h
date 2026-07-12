@@ -120,6 +120,24 @@ function ctxPath(config: D4HConfig): string {
     return `/v3/${encodeURIComponent(config.context)}/${config.contextId}`;
 }
 
+/** Team/org display name — GET /v3/{context}/{contextId} → title. Best-effort. */
+export async function fetchContextName(config: D4HConfig): Promise<string | null> {
+    const url = `${effectiveBaseUrl(config)}${ctxPath(config)}`;
+    try {
+        const res = await d4hFetch(url, {
+            method:  'GET',
+            headers: authHeaders(config),
+        });
+        if (!res.ok) return null;
+        const body = await res.json() as RawRecord;
+        const title = typeof body.title === 'string' ? body.title.trim() : '';
+        const name = typeof body.name === 'string' ? body.name.trim() : '';
+        return title || name || null;
+    } catch {
+        return null;
+    }
+}
+
 export interface PaginatedFetchResult {
     records:  RawRecord[];
     pages:    number;     // pages actually fetched
