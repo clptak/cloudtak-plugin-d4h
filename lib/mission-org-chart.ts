@@ -1,6 +1,5 @@
 // Load the incident-manager org chart from a DataSync mission's mission_schema.json.
 
-import { Preferences } from '@capacitor/preferences';
 import Subscription from '../../../src/base/subscription.ts';
 import { server } from '../../../src/std.ts';
 import { db } from '../../../src/database.ts';
@@ -44,11 +43,6 @@ async function fetchMissionFileText(hash: string, name: string): Promise<string>
     return res.data;
 }
 
-async function sessionToken(): Promise<string> {
-    const { value } = await Preferences.get({ key: 'token' });
-    return value || '';
-}
-
 /** Mission token from Dexie subscription row or incident-manager session storage. */
 async function missionTokenForGuid(guid: string): Promise<string | undefined> {
     const row = await db.subscription.get(guid);
@@ -81,7 +75,6 @@ export async function loadOrgChartFromMission(missionGuid: string): Promise<Load
     const missionToken = await missionTokenForGuid(missionGuid);
 
     const sub = await Subscription.load(missionGuid, {
-        token: await sessionToken(),
         missiontoken: missionToken,
         subscribed: true,
     });

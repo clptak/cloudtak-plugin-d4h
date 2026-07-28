@@ -568,7 +568,10 @@
                             <div class='fw-semibold'>
                                 Request payload
                             </div>
-                            <pre class='small mb-0' style='white-space:pre-wrap'>{{ result.payload }}</pre>
+                            <pre
+                                class='small mb-0'
+                                style='white-space:pre-wrap'
+                            >{{ result.payload }}</pre>
                         </div>
                         <div
                             v-if='result.apiBody'
@@ -577,7 +580,10 @@
                             <div class='fw-semibold'>
                                 D4H response
                             </div>
-                            <pre class='small mb-0' style='white-space:pre-wrap'>{{ result.apiBody }}</pre>
+                            <pre
+                                class='small mb-0'
+                                style='white-space:pre-wrap'
+                            >{{ result.apiBody }}</pre>
                         </div>
                     </details>
                 </div>

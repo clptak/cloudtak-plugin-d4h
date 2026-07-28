@@ -1,14 +1,8 @@
 // Load subject-information logs from a DataSync mission (incident-manager Logger tab).
 
-import { Preferences } from '@capacitor/preferences';
 import Subscription from '../../../src/base/subscription.ts';
 import { db } from '../../../src/database.ts';
 import { parseSubjectsFromLogs, type ParsedSubject } from './subject-info.ts';
-
-async function sessionToken(): Promise<string> {
-    const { value } = await Preferences.get({ key: 'token' });
-    return value || '';
-}
 
 async function missionTokenForGuid(guid: string): Promise<string | undefined> {
     const row = await db.subscription.get(guid);
@@ -37,7 +31,6 @@ export async function loadSubjectsFromMission(missionGuid: string): Promise<Load
     const missionToken = await missionTokenForGuid(missionGuid);
 
     const sub = await Subscription.load(missionGuid, {
-        token: await sessionToken(),
         missiontoken: missionToken,
         subscribed: true,
     });
