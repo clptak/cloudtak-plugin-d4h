@@ -165,10 +165,27 @@
                                 class='text-muted fw-normal'
                             > of {{ roster.members.length }}</span>)
                         </span>
+                        <select
+                            v-model='qualFilter'
+                            class='form-select form-select-sm ms-auto'
+                            style='max-width:220px'
+                            title='Filter by qualification'
+                        >
+                            <option value=''>
+                                Any qualification
+                            </option>
+                            <option
+                                v-for='name in qualificationOptions'
+                                :key='name'
+                                :value='name'
+                            >
+                                {{ name }}
+                            </option>
+                        </select>
                         <input
                             v-model='filter'
                             type='search'
-                            class='form-control form-control-sm ms-auto'
+                            class='form-control form-control-sm'
                             style='max-width:240px'
                             placeholder='Filter by name, badge, position, mobile…'
                         >
@@ -204,32 +221,60 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr
+                                <template
                                     v-for='m in sortedMembers'
                                     :key='m.id'
-                                    style='cursor:default'
-                                    @mouseenter='showQuals(m, $event)'
-                                    @mouseleave='hideQuals'
                                 >
-                                    <td class='font-monospace'>
-                                        {{ m.ref ?? '—' }}
-                                    </td>
-                                    <td>
-                                        {{ m.name }}
-                                        <span
-                                            v-if='m.qualifications?.length'
-                                            class='badge bg-success text-white ms-1'
-                                            style='font-size:0.65em;vertical-align:middle'
-                                            :title='m.qualifications.length + " qualification(s) — hover to view"'
-                                        >{{ m.qualifications.length }}</span>
-                                    </td>
-                                    <td class='text-muted'>
-                                        {{ m.position ?? '' }}
-                                    </td>
-                                    <td class='font-monospace'>
-                                        {{ m.mobile ?? '—' }}
-                                    </td>
-                                </tr>
+                                    <tr
+                                        style='cursor:pointer'
+                                        :class='{ "table-active": expandedMemberId === m.id }'
+                                        @click='toggleExpand(m.id)'
+                                    >
+                                        <td class='font-monospace'>
+                                            {{ m.ref ?? '—' }}
+                                        </td>
+                                        <td>
+                                            {{ m.name }}
+                                            <span
+                                                v-if='m.qualifications?.length'
+                                                class='badge bg-success text-white ms-1'
+                                                style='font-size:0.65em;vertical-align:middle'
+                                                :title='m.qualifications.length + " qualification(s) — click to expand"'
+                                            >{{ m.qualifications.length }}</span>
+                                        </td>
+                                        <td class='text-muted'>
+                                            {{ m.position ?? '' }}
+                                        </td>
+                                        <td class='font-monospace'>
+                                            {{ m.mobile ?? '—' }}
+                                        </td>
+                                    </tr>
+                                    <tr v-if='expandedMemberId === m.id'>
+                                        <td
+                                            colspan='4'
+                                            class='bg-body-tertiary'
+                                        >
+                                            <div class='py-2 px-1'>
+                                                <div
+                                                    v-if='m.qualifications?.length'
+                                                    class='d-flex flex-wrap gap-1'
+                                                >
+                                                    <span
+                                                        v-for='q in m.qualifications'
+                                                        :key='q.id'
+                                                        class='badge'
+                                                        :class='isExpired(q) ? "bg-secondary text-white text-decoration-line-through" : "bg-success text-white"'
+                                                        :title='q.expiresAt ? ((isExpired(q) ? "Expired " : "Expires ") + q.expiresAt.slice(0, 10)) : "No expiry on record"'
+                                                    >{{ q.name }}</span>
+                                                </div>
+                                                <span
+                                                    v-else
+                                                    class='text-muted small'
+                                                >No qualifications on record.</span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </template>
                                 <tr v-if='sortedMembers.length === 0'>
                                     <td
                                         colspan='4'
@@ -247,46 +292,6 @@
                     class='text-muted small text-center py-4'
                 >
                     No personnel synced yet.
-                </div>
-
-                <!-- Hover popup: qualifications for the member row under the cursor.
-                     position:fixed escapes the table's scroll clipping; pointer-events:none
-                     means moving toward it counts as leaving the row, so it dismisses. -->
-                <div
-                    v-if='hoverQuals'
-                    class='card shadow'
-                    :style='{
-                        position: "fixed",
-                        left: hoverQuals.x + "px",
-                        top: hoverQuals.y + "px",
-                        zIndex: 1080,
-                        width: "300px",
-                        maxHeight: "260px",
-                        overflow: "auto",
-                        pointerEvents: "none",
-                    }'
-                >
-                    <div class='card-header py-1 px-2 small fw-semibold'>
-                        {{ hoverQuals.member.name }}
-                    </div>
-                    <div class='card-body py-2 px-2'>
-                        <div
-                            v-if='hoverQuals.member.qualifications?.length'
-                            class='d-flex flex-wrap gap-1'
-                        >
-                            <span
-                                v-for='q in hoverQuals.member.qualifications'
-                                :key='q.id'
-                                class='badge'
-                                :class='isExpired(q) ? "bg-secondary text-white text-decoration-line-through" : "bg-success text-white"'
-                                :title='q.expiresAt ? ((isExpired(q) ? "Expired " : "Expires ") + q.expiresAt.slice(0, 10)) : "No expiry on record"'
-                            >{{ q.name }}</span>
-                        </div>
-                        <span
-                            v-else
-                            class='text-muted small'
-                        >No qualifications on record.</span>
-                    </div>
                 </div>
             </div>
 
@@ -660,14 +665,14 @@
 </template>
 
 <script setup lang='ts'>
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import ConfigView from './ConfigView.vue';
 import SubmitIncidentView from './SubmitIncidentView.vue';
 import SubmitRosterView from './SubmitRosterView.vue';
 import SubmitSubjectView from './SubmitSubjectView.vue';
 import { loadConfig, effectiveBaseUrl, type D4HConfig } from '../lib/d4h-config.ts';
 import { syncNow, loadCachedRoster, loadCachedMeta, liveMeta } from '../lib/d4h-roster.ts';
-import type { D4HRoster, D4HRosterMeta, D4HMember } from '../lib/d4h-types.ts';
+import type { D4HRoster, D4HRosterMeta } from '../lib/d4h-types.ts';
 
 const loaded     = ref(false);
 const config     = ref<D4HConfig | null>(null);
@@ -676,6 +681,8 @@ const meta       = ref<D4HRosterMeta | null>(null);
 const syncing    = ref(false);
 const showConfig = ref(false);
 const filter     = ref('');
+const qualFilter = ref('');
+const expandedMemberId = ref<number | null>(null);
 const sortBy     = ref<'badge' | 'name'>('name');
 const sortDir    = ref<'asc' | 'desc'>('asc');
 const equipFilter  = ref('');
@@ -744,10 +751,24 @@ const relativeFetchedAt = computed(() => {
     return new Date(meta.value.fetchedAt).toLocaleDateString();
 });
 
+const qualificationOptions = computed(() => {
+    const names = new Set<string>();
+    for (const m of roster.value?.members ?? []) {
+        for (const q of m.qualifications ?? []) {
+            if (q.name) names.add(q.name);
+        }
+    }
+    return [...names].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+});
+
 const filteredMembers = computed(() => {
     if (!roster.value) return [];
     const q = filter.value.trim().toLowerCase();
+    const qual = qualFilter.value;
     return roster.value.members.filter(m => {
+        if (qual && !(m.qualifications ?? []).some(qq => qq.name === qual)) {
+            return false;
+        }
         if (!q) return true;
         return m.name.toLowerCase().includes(q)
             || (m.ref && m.ref.toLowerCase().includes(q))
@@ -768,6 +789,17 @@ const sortedMembers = computed(() => {
     });
 });
 
+watch(filteredMembers, (members) => {
+    if (expandedMemberId.value == null) return;
+    if (!members.some(m => m.id === expandedMemberId.value)) {
+        expandedMemberId.value = null;
+    }
+});
+
+function toggleExpand(id: number): void {
+    expandedMemberId.value = expandedMemberId.value === id ? null : id;
+}
+
 function toggleSort(key: 'badge' | 'name'): void {
     if (sortBy.value === key) {
         sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc';
@@ -780,26 +812,6 @@ function toggleSort(key: 'badge' | 'name'): void {
 /** A qualification award whose end date is in the past is shown as expired. */
 function isExpired(q: { expiresAt?: string }): boolean {
     return !!q.expiresAt && new Date(q.expiresAt).getTime() < Date.now();
-}
-
-// Hover popup of a member's qualifications, positioned next to the hovered row.
-const hoverQuals = ref<{ member: D4HMember; x: number; y: number } | null>(null);
-
-function showQuals(m: D4HMember, e: MouseEvent): void {
-    const el = e.currentTarget as HTMLElement | null;
-    if (!el) return;
-    const rect = el.getBoundingClientRect();
-    const PANEL_W = 300;
-    hoverQuals.value = {
-        member: m,
-        // Prefer just to the right of the row; clamp so it stays on screen.
-        x: Math.min(rect.right + 8, window.innerWidth - PANEL_W - 8),
-        y: Math.max(8, Math.min(rect.top, window.innerHeight - 268)),
-    };
-}
-
-function hideQuals(): void {
-    hoverQuals.value = null;
 }
 
 const filteredEquipment = computed(() => {
