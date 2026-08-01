@@ -11,15 +11,34 @@ That includes:
 - API keys, passwords, or private keys
 - Production hostnames, team/org IDs, or deployment-specific overlay mappings tied to a live operation
 
-Credentials are entered at runtime in the plugin UI and stored in Capacitor `Preferences` under `d4h-config-v1` on the user's device. They are not part of the source tree.
+Credentials are entered at runtime in the plugin UI. They are not part of the source tree.
 
 ## Runtime token handling
 
-- **D4H token:** User-pasted in Config, persisted per device in `Preferences` (`d4h-config-v1`). Used as `Authorization: Bearer …` on D4H API calls.
-- **CloudTAK session token:** Read from `Preferences` key `token` when the plugin falls back to CloudTAK's `/api/proxy` (CSP-blocked direct fetch). Not stored in this repo.
-- **Roster cache:** `db.kv` keys `d4h:roster` and `d4h:meta` hold normalized personnel/equipment data only — never the D4H token.
+### Hybrid (preferred)
 
-Because D4H tokens live in the browser, treat device access as equivalent to token access. For stricter posture, use a server-proxy route so tokens never reach client storage.
+- **Server D4H token:** System admin pastes in Config → Server sync. Stored in CloudTAK
+  Postgres (`d4h_config.token`). Used only by the API for periodic / admin sync.
+  Never written to `db.kv` or returned by `GET /api/d4h/config` (redacted: `tokenConfigured`).
+- **Roster reads:** Authenticated JWT → group-filtered Postgres rows via `/api/d4h/*`.
+- **Local cache:** `db.kv` keys `d4h:roster` / `d4h:meta` hold the *already-authorized*
+  response for snappy remounts — never the D4H token.
+
+### Local fallback / writes
+
+- **Local D4H token:** Still stored in Capacitor `Preferences` (`d4h-config-v1`) for
+  Submit Incident / Roster / Subject and for Sync when the server route is not configured.
+- **CloudTAK session token:** Read from `Preferences` key `token` when the plugin falls
+  back to CloudTAK's `/api/proxy` (CSP-blocked direct fetch). Not stored in this repo.
+
+Treat device access as equivalent to any local token. Prefer server-held credentials for
+shared roster sync so operators do not each hold a long-lived D4H PAT in the browser.
+
+## Access control
+
+Roster visibility is gated by TAK channel/group membership on the server (`groups TEXT[]`
+on each row ∩ caller's active TAK groups). System and agency admins see all rows.
+Write/sync endpoints require `Auth.as_user(..., { admin: true })` (system admin).
 
 ## Files intentionally excluded from git
 

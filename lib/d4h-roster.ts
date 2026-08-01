@@ -1,12 +1,9 @@
-// Sync orchestration + per-session KV cache.
+// Sync orchestration + IndexedDB view cache.
 //
-// Phase 3 cache strategy (per plan §4): keep the normalized roster in CloudTAK's
-// shared Dexie `db.kv` under two keys, so a reload still shows the last sync and
-// any other plugin in the same browser session could read it.
-//
-// Phase 3.5 will demote this to a NON-authoritative cache and add a Postgres-backed
-// server route that enforces TAK-group visibility (plan §4A). Until then, the kv
-// cache is the only persistence layer.
+// When the hybrid server route is installed (`/api/d4h/*`), Postgres is authoritative
+// and these `db.kv` keys hold a NON-authoritative cache of the *already group-filtered*
+// response (Phase 6). Prefer lib/d4h-api.ts for reads/sync; use syncNow() only as a
+// client-direct fallback when the server route is missing or unconfigured.
 //
 // Keys:
 //   d4h:roster  → JSON D4HRoster (members + equipment + meta)
@@ -339,6 +336,12 @@ export async function syncNow(config: D4HConfig): Promise<SyncResult> {
     }
 
     return { ok: true, roster, warnings, stats };
+}
+
+/** Write an already-authorized roster into the local Phase-6 cache. */
+export async function cacheAuthorizedRoster(roster: D4HRoster): Promise<void> {
+    await KV.update(ROSTER_KEY, JSON.stringify(roster));
+    await KV.update(META_KEY, JSON.stringify(roster.meta));
 }
 
 export async function loadCachedRoster(): Promise<D4HRoster | null> {

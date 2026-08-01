@@ -26,7 +26,7 @@ trap cleanup EXIT
 cd "$WEB"
 
 echo "==> eslint $PLUGIN_DIR"
-npx eslint --config eslint.config.js "./$PLUGIN_DIR/"
+npx eslint --config eslint.config.js "./$PLUGIN_DIR/" --ignore-pattern '**/server/**'
 
 echo "==> vue-tsc (host check; fail only on $PLUGIN_DIR errors)"
 set +e

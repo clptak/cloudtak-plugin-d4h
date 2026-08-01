@@ -13,5 +13,5 @@
         "noEmit":                     true
     },
     "include": ["**/*.ts", "**/*.vue", "env.d.ts"],
-    "exclude": ["node_modules", "spike", "docs", "skills"]
+    "exclude": ["node_modules", "spike", "docs", "skills", "server"]
 }

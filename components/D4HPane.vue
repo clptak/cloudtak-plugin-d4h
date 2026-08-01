@@ -11,6 +11,7 @@
         <ConfigView
             v-else-if='!hasConfig'
             @saved='onConfigSaved'
+            @server-saved='onServerConfigSaved'
         />
 
         <!-- Roster pane -->
@@ -28,7 +29,7 @@
                         v-if='syncing'
                         class='spinner-border spinner-border-sm me-1'
                     />
-                    {{ syncing ? 'Syncing…' : 'Sync now' }}
+                    {{ syncing ? 'Syncing…' : syncButtonLabel }}
                 </button>
                 <span
                     v-if='meta'
@@ -658,6 +659,7 @@
                 <ConfigView
                     @saved='onConfigSaved'
                     @cleared='onConfigCleared'
+                    @server-saved='onServerConfigSaved'
                 />
             </div>
         </div>
@@ -671,11 +673,19 @@ import SubmitIncidentView from './SubmitIncidentView.vue';
 import SubmitRosterView from './SubmitRosterView.vue';
 import SubmitSubjectView from './SubmitSubjectView.vue';
 import { loadConfig, effectiveBaseUrl, type D4HConfig } from '../lib/d4h-config.ts';
-import { syncNow, loadCachedRoster, loadCachedMeta, liveMeta } from '../lib/d4h-roster.ts';
+import {
+    syncNow, loadCachedRoster, loadCachedMeta, liveMeta, cacheAuthorizedRoster,
+} from '../lib/d4h-roster.ts';
+import {
+    getServerConfig, fetchServerRoster, triggerServerSync,
+    type D4HServerConfigPublic,
+} from '../lib/d4h-api.ts';
+import ProfileConfig from '../../../src/base/profile.ts';
 import type { D4HRoster, D4HRosterMeta } from '../lib/d4h-types.ts';
 
 const loaded     = ref(false);
 const config     = ref<D4HConfig | null>(null);
+const serverCfg  = ref<D4HServerConfigPublic | null>(null);
 const roster     = ref<D4HRoster | null>(null);
 const meta       = ref<D4HRosterMeta | null>(null);
 const syncing    = ref(false);
@@ -739,7 +749,13 @@ const submitSubTabs = computed(() => [
     { key: 'submit-subject' as const, label: 'Submit Subject' },
 ]);
 
-const hasConfig = computed(() => !!config.value);
+const serverReady = computed(() => !!serverCfg.value?.tokenConfigured);
+const isSystemAdmin = ref(false);
+const hasConfig = computed(() => !!config.value || serverReady.value || !!roster.value);
+const syncButtonLabel = computed(() => {
+    if (serverReady.value && !isSystemAdmin.value) return 'Refresh';
+    return 'Sync now';
+});
 
 const relativeFetchedAt = computed(() => {
     if (!meta.value) return '';
@@ -931,15 +947,55 @@ function formatIncidentDate(iso?: string): string {
 
 let metaSub: { unsubscribe: () => void } | null = null;
 
+async function probeServer(): Promise<void> {
+    try {
+        serverCfg.value = await getServerConfig();
+    } catch {
+        // Route missing or auth failure — stay in local/fallback mode.
+        serverCfg.value = null;
+    }
+}
+
+async function refreshFromServer(opts: { quiet?: boolean } = {}): Promise<boolean> {
+    try {
+        const r = await fetchServerRoster();
+        await cacheAuthorizedRoster(r);
+        roster.value = r;
+        meta.value = r.meta;
+        return true;
+    } catch (e) {
+        if (!opts.quiet) {
+            syncStatus.value = {
+                kind: 'err',
+                title: 'Could not refresh from CloudTAK.',
+                detail: (e as Error).message,
+            };
+        }
+        return false;
+    }
+}
+
 onMounted(async () => {
     config.value = await loadConfig();
     roster.value = await loadCachedRoster();
     meta.value   = await loadCachedMeta();
+    try {
+        const adminCfg = await ProfileConfig.get('system_admin');
+        isSystemAdmin.value = !!(adminCfg?.value);
+    } catch {
+        isSystemAdmin.value = false;
+    }
     loaded.value = true;
 
     metaSub = liveMeta().subscribe({
         next: (m) => { meta.value = m; },
     });
+
+    await probeServer();
+    if (serverReady.value) {
+        // Soft refresh — cache already painted the UI.
+        void refreshFromServer({ quiet: true });
+    }
 });
 
 onUnmounted(() => {
@@ -951,62 +1007,144 @@ function statsLine(label: string, s: { pages: number; rawCount: number; reported
     return `${label}: ${s.rawCount}${total} across ${s.pages} page${s.pages === 1 ? '' : 's'}`;
 }
 
+function applySyncSuccess(result: { roster: D4HRoster; warnings: string[]; stats: {
+    members: { pages: number; rawCount: number; reportedTotal: number | null };
+    equipment: { pages: number; rawCount: number; reportedTotal: number | null };
+    qualifications: { pages: number; rawCount: number; reportedTotal: number | null };
+    externalResources: { queriesRun: number; pages: number; rawCount: number };
+    incidents: { pages: number; rawCount: number; reportedTotal: number | null };
+} }, source: string): void {
+    roster.value = result.roster;
+    meta.value = result.roster.meta;
+    warningsDismissed.value = false;
+    const warnCount = result.warnings.length;
+    const cats = result.roster.meta.equipmentCategories ?? [];
+    const kept = cats.filter(c => c.included);
+    const detail = [
+        `Source: ${source}`,
+        statsLine('Members', result.stats.members),
+        statsLine('Equipment', result.stats.equipment),
+        `External resources: ${result.stats.externalResources.rawCount} unique across ${result.stats.externalResources.queriesRun} search quer${result.stats.externalResources.queriesRun === 1 ? 'y' : 'ies'}`,
+        statsLine('Incidents (last 30 days)', result.stats.incidents),
+        kept.length
+            ? `Equipment kept: ${kept.map(c => `${c.title} (${c.count})`).join(', ')}`
+            : (cats.length ? `Equipment kept: none of ${cats.length} categories matched` : ''),
+        statsLine('Qualifications', result.stats.qualifications),
+        warnCount ? `${warnCount} warning${warnCount === 1 ? '' : 's'} — see below.` : '',
+    ].filter(Boolean).join('\n');
+    syncStatus.value = {
+        kind:  'ok',
+        title: `Synced ${result.roster.meta.memberCount} member${result.roster.meta.memberCount === 1 ? '' : 's'}.`,
+        detail,
+    };
+}
+
 async function onIncidentCreated(): Promise<void> {
     roster.value = await loadCachedRoster();
 }
 
 async function onSync(): Promise<void> {
-    if (!config.value) return;
     syncing.value = true;
-    syncStatus.value = { kind: 'info', title: 'Syncing roster from D4H…' };
     try {
+        if (serverReady.value) {
+            syncStatus.value = { kind: 'info', title: 'Syncing roster via CloudTAK server…' };
+            const result = await triggerServerSync();
+            if (result.ok && result.roster) {
+                await cacheAuthorizedRoster(result.roster);
+                // Re-fetch filtered view for this caller's TAK groups.
+                const filtered = await refreshFromServer({ quiet: true });
+                if (!filtered) {
+                    applySyncSuccess({
+                        roster: result.roster,
+                        warnings: result.warnings,
+                        stats: result.stats,
+                    }, 'server (unfiltered admin view cached)');
+                } else {
+                    applySyncSuccess({
+                        roster: roster.value!,
+                        warnings: result.warnings,
+                        stats: result.stats,
+                    }, 'server → Postgres → group-filtered');
+                }
+                await probeServer();
+            } else {
+                syncStatus.value = { kind: 'err', title: 'Server sync failed.', detail: result.error };
+            }
+            return;
+        }
+
+        if (!config.value) {
+            syncStatus.value = {
+                kind: 'err',
+                title: 'No D4H config.',
+                detail: 'Save a local token or ask an admin to configure server sync.',
+            };
+            return;
+        }
+
+        syncStatus.value = { kind: 'info', title: 'Syncing roster from D4H (local)…' };
         const result = await syncNow(config.value);
         if (result.ok && result.roster) {
-            roster.value = result.roster;
-            meta.value   = result.roster.meta;
-            warningsDismissed.value = false;
-            const warnCount = result.warnings.length;
-            const cats = result.roster.meta.equipmentCategories ?? [];
-            const kept = cats.filter(c => c.included);
-            const detail = [
-                statsLine('Members', result.stats.members),
-                statsLine('Equipment', result.stats.equipment),
-                `External resources: ${result.stats.externalResources.rawCount} unique across ${result.stats.externalResources.queriesRun} search quer${result.stats.externalResources.queriesRun === 1 ? 'y' : 'ies'}`,
-                statsLine('Incidents (last 30 days)', result.stats.incidents),
-                kept.length
-                    ? `Equipment kept: ${kept.map(c => `${c.title} (${c.count})`).join(', ')}`
-                    : (cats.length ? `Equipment kept: none of ${cats.length} categories matched` : ''),
-                statsLine('Qualifications', result.stats.qualifications),
-                warnCount ? `${warnCount} warning${warnCount === 1 ? '' : 's'} — see below.` : '',
-            ].filter(Boolean).join('\n');
-            syncStatus.value = {
-                kind:  'ok',
-                title: `Synced ${result.roster.meta.memberCount} member${result.roster.meta.memberCount === 1 ? '' : 's'}.`,
-                detail,
-            };
+            applySyncSuccess({
+                roster: result.roster,
+                warnings: result.warnings,
+                stats: result.stats,
+            }, 'browser → D4H (local fallback)');
         } else {
             syncStatus.value = { kind: 'err', title: 'Sync failed.', detail: result.error };
         }
     } catch (e) {
-        syncStatus.value = { kind: 'err', title: 'Sync threw.', detail: (e as Error).message };
+        const msg = (e as Error).message;
+        // Non-admin hitting server sync gets 401 — fall back to refresh-only or local.
+        if (serverReady.value && (msg === '401' || /System Administrator/i.test(msg))) {
+            syncStatus.value = { kind: 'info', title: 'Refreshing roster from CloudTAK…' };
+            const ok = await refreshFromServer();
+            if (ok) {
+                syncStatus.value = {
+                    kind: 'ok',
+                    title: 'Refreshed from CloudTAK.',
+                    detail: 'Server pull is admin-only; this loaded the last shared sync.',
+                };
+            }
+            return;
+        }
+        syncStatus.value = { kind: 'err', title: 'Sync threw.', detail: msg };
     } finally {
         syncing.value = false;
     }
 }
 
-function onConfigSaved(cfg: D4HConfig): void {
+async function onConfigSaved(cfg: D4HConfig): Promise<void> {
     config.value     = cfg;
     showConfig.value = false;
+    await probeServer();
     syncStatus.value = {
         kind:   'info',
         title:  'Config saved.',
-        detail: `Target: ${effectiveBaseUrl(cfg)} (${cfg.context}/${cfg.contextId}). Click "Sync now" to pull the roster.`,
+        detail: serverReady.value
+            ? 'Server sync is configured. Click "Sync now" (admin) to pull from D4H into CloudTAK.'
+            : `Local target: ${effectiveBaseUrl(cfg)} (${cfg.context}/${cfg.contextId}). Click "Sync now" to pull the roster.`,
     };
+}
+
+async function onServerConfigSaved(): Promise<void> {
+    await probeServer();
+    if (serverReady.value) {
+        syncStatus.value = {
+            kind: 'info',
+            title: 'Server config saved.',
+            detail: 'Click "Sync now" to pull from D4H into CloudTAK (system admin), or wait for the periodic interval.',
+        };
+        void refreshFromServer({ quiet: true });
+    }
 }
 
 function onConfigCleared(): void {
     config.value = null;
-    roster.value = null;
-    meta.value   = null;
+    // Keep server mode / cached roster if present.
+    if (!serverReady.value) {
+        roster.value = null;
+        meta.value   = null;
+    }
 }
 </script>

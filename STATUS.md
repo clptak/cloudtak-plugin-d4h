@@ -1,33 +1,38 @@
 # cloudtak-plugin-d4h — Status
 
-_Last updated: 2026-06-06. Grounded in the current code, not just the plan._
+_Last updated: 2026-07-31. Grounded in the current code, not just the plan._
 
 Point-in-time status of where the plugin's data lives, what D4H returns on sync, what gets
-stored, and how other CloudTAK plugins can consume it. For design rationale and planned
-(not-yet-built) server/access-control work, see `docs/PLAN.md`.
+stored, and how other CloudTAK plugins can consume it. For design rationale see `docs/PLAN.md`.
 
 ---
 
 ## Architecture
 
-All D4H calls run **client-side** from the browser (Bearer token in config). Nothing goes
-through the CloudTAK server today. On **Sync now**, the plugin calls D4H, normalizes results,
-applies filters, and writes two blobs into CloudTAK's shared IndexedDB.
+**Hybrid mode (preferred):** when `server/plugin-d4h.ts` is installed into CloudTAK
+`api/stateless/routes/`, a system admin stores the D4H token in Postgres (`d4h_config`).
+The API pulls D4H on a schedule (and on admin `POST /api/d4h/sync`), writes normalized rows
+tagged with `default_groups`, and serves group-filtered reads. The browser caches the
+**already-authorized** response in `db.kv` for instant remounts.
+
+**Fallback:** if the server route is missing or has no token, Sync now still runs
+client-direct from Preferences (same as before).
 
 ```
-D4H API                          Browser / CloudTAK plugin
-────────                         ─────────────────────────
-members                    ──►   normalize + filter ──► db.kv  d4h:roster
-equipment                  ──►                          ──► db.kv  d4h:meta
-equipment-categories       ──►   (lookup only)
-equipment-brands           ──►   (lookup only)
-equipment-models           ──►   (lookup only)
-member-qualifications      ──►
-
-Preferences  d4h-config-v1  ◄──  token + context (never in db.kv)
+D4H API ──(admin / periodic)──► CloudTAK API (plugin-d4h.ts)
+                                      │
+                                      ▼
+                               Postgres d4h_* tables   ← authoritative + groups[]
+                                      │
+                         GET /api/d4h/roster|members|…
+                                      │
+                                      ▼
+                               Browser db.kv cache     ← non-authoritative view
 ```
 
-Base path: `https://api.team-manager.{region}.d4h.com/v3/{context}/{contextId}/…`  
+Install: `./scripts/install.sh [/path/to/CloudTAK]` then rebuild the API image.
+
+Base path: `https://api.team-manager.{region}.d4h.com/v3/{context}/{contextId}/…`
 Pagination: `?page=0&size=100` (0-indexed), deduped by record `id`.
 
 ---
@@ -36,140 +41,76 @@ Pagination: `?page=0&size=100` (0-indexed), deduped by record `id`.
 
 | # | Endpoint | What D4H returns (typical) | How the plugin uses it | Persisted? |
 |---|----------|----------------------------|-------------------------|------------|
-| 1 | **`/members`** (+ optional `?status=OPERATIONAL`) | `{ results: [...] }` — `id`, `ref`, `name`, `position`, `status`, nested `email`, `mobile`, `work`, `home`, etc. | Normalized to `D4HMember`. **Kept only if `status === OPERATIONAL`** (client-side is authoritative). | Yes → `d4h:roster.members[]` |
-| 2 | **`/equipment`** | Rows with `id`, `ref`, `status`, `kind` (`title`, `type` e.g. VEHICLE), `model` (`title` + often id-only `brand`), top-level `brand` (full or id-only), `category` (usually `{ id }` only). | Normalized to `D4HEquipment`. Lookup tables fill category / make / model. Then filtered (see below). | Yes → `d4h:roster.equipment[]` (filtered subset only) |
-| 3 | **`/equipment-categories`** | `{ results: [{ id, title, … }] }` | id → title map; resolves **Category** on each item. | Not stored separately — only resolved `category` string |
-| 4 | **`/equipment-brands`** | `{ results: [{ id, title, … }] }` | id → title map; fills **Make** when inline brand has no title. | Not stored separately — only resolved `make` |
-| 5 | **`/equipment-models`** | `{ results: [{ id, title, brand: { id }, … }] }` | Fills **Model** when missing; can supply brand id for **Make**. | Not stored separately — only resolved `model` / `make` |
-| 6 | **`/member-qualifications`** | Qualification **catalog** — `{ id, title }` definitions, **no member link**. | id → title map (resolves award titles). | Not stored separately |
-| 7 | **`/member-qualification-awards`** | Award records linking `member: { id }` → `qualification: { id }` with `startsAt`/`endsAt`. | Title resolved from catalog (#6); grouped by member, latest award per qualification kept. | Yes → `members[].qualifications[]` |
+| 1 | **`/members`** (+ optional `?status=OPERATIONAL`) | `{ results: [...] }` — `id`, `ref`, `name`, `position`, `status`, nested `email`, `mobile`, etc. | Normalized to `D4HMember`. **Kept only if `status === OPERATIONAL`**. | Yes → Postgres `d4h_members` (+ `db.kv` cache) |
+| 2 | **`/equipment`** | Rows with kind/model/brand/category refs | Normalized + filtered (operational + category keywords) | Yes → `d4h_equipment` |
+| 3–5 | equipment-categories / brands / models | Lookup tables | Resolve titles onto equipment | Not stored separately |
+| 6–7 | member-qualifications + awards | Catalog + member links | Joined onto `members[].qualifications[]` | Yes (on members) |
 
-Endpoints 3–7 are **best-effort** (404 → warning, sync continues). Raw D4H JSON is never
-cached — only the normalized roster.
-
-> **Qualifications are two-part in D4H.** `/member-qualifications` is just the *catalog* of
-> definitions (no member link); who-holds-what lives in `/member-qualification-awards`. Both
-> are required to build each member's `qualifications[]`.
+Endpoints 3–7 are **best-effort** (404 → warning, sync continues). Raw D4H JSON is never cached.
 
 ---
 
 ## Filters applied before storage
 
-| Dataset | Filter | Where |
-|---------|--------|--------|
-| **Personnel** | `status === OPERATIONAL` only | `lib/d4h-roster.ts` |
-| **Equipment — status** | `OPERATIONAL` or any status starting with `OPERATIONAL` | `lib/d4h-status.ts` |
-| **Equipment — category** | Category title contains `vehicle`, `uas`, or `tech litter` (case-insensitive) | `lib/d4h-equipment-categories.ts` |
-
-Discovery stats for **all operational** equipment categories (including excluded ones) are
-stored in `meta.equipmentCategories[]` for UI badges and sync warnings.
+| Dataset | Filter |
+|---------|--------|
+| **Personnel** | `status === OPERATIONAL` only |
+| **Equipment — status** | `OPERATIONAL` or `OPERATIONAL*` prefix |
+| **Equipment — category** | Title contains `vehicle`, `uas`, or `tech litter` |
 
 ---
 
-## Where data is stored in CloudTAK
+## Where data is stored
 
-Two separate stores, both **browser-local only** — no server-side persistence built yet.
+### 1. Capacitor `Preferences` — local credentials (fallback + writes)
 
-### 1. Capacitor `Preferences` — credentials only
+| Key | Contents |
+|-----|----------|
+| `d4h-config-v1` | `{ region, baseUrl?, context, contextId, token }` |
 
-| Key | Contents | Scope |
-|-----|----------|--------|
-| `d4h-config-v1` | `{ region, baseUrl?, context, contextId, token }` | Per device/browser |
+Still required for Submit Incident / Roster / Subject. Optional for roster read when server sync is configured.
 
-Native: Keychain / EncryptedSharedPreferences. Web/PWA: localStorage (not encrypted).  
-Deliberately kept out of `db.kv` so the token is not in cross-plugin roster storage.
+### 2. Postgres (hybrid) — authoritative shared roster
 
-### 2. CloudTAK Dexie `db.kv` — shared roster cache
+| Table | Role |
+|-------|------|
+| `d4h_config` | Server token, interval, `default_groups` |
+| `d4h_members` / `d4h_equipment` / `d4h_external_resources` / `d4h_incidents` | Normalized rows + `groups TEXT[]` |
+| `d4h_meta` | Last-sync header / warnings JSON |
 
-| Key | Contents | Scope |
-|-----|----------|--------|
-| `d4h:roster` | Full `D4HRoster` JSON | Per device/browser; visible to any plugin in the same session |
-| `d4h:meta` | Lightweight `D4HRosterMeta` (header only, no arrays) | Same; used for "last sync" and reactive updates via `liveQuery` |
+### 3. CloudTAK Dexie `db.kv` — non-authoritative authorized cache
 
-Written via `KV.update()` in `lib/d4h-roster.ts`. Survives reload; **not** synced across
-devices or users; **not** access-controlled.
+| Key | Contents |
+|-----|----------|
+| `d4h:roster` / `d4h:meta` | Filtered view for this caller |
 
----
-
-## Normalized shapes in `d4h:roster`
-
-`D4HRoster = { meta, members[], equipment[] }` (`lib/d4h-types.ts`).
-
-### `meta`
-
-- `fetchedAt`, `region`, `context`, `contextId`
-- `memberCount`, `equipmentCount` (post-filter counts)
-- `equipmentCategories[]` — `{ title, count, included }` per category seen on operational equipment
-- `warnings[]` — pagination gaps, dropped records, failed lookups, category keyword mismatches, etc.
-
-### `members[]` (Personnel tab / cross-plugin lookup)
-
-| Field | Source |
-|-------|--------|
-| `id` | D4H member id |
-| `ref` | D4H ref (links to TAK callsign suffix — plan §7A) |
-| `name`, `position`, `status` | Top-level member fields |
-| `email` | `email.value` |
-| `mobile` | `mobile.phone` (shown in UI) |
-| `phone` | mobile → work → home fallback |
-| `qualifications[]` | Joined from qualifications endpoint |
-| `groups[]` | Reserved for future server-side access control — **empty today** |
-
-### `equipment[]` (Equipment tab — filtered subset)
-
-| Field | UI column | Source |
-|-------|-----------|--------|
-| `id` | (internal key only) | D4H equipment id |
-| `ref` | **ID** | D4H ref / badge number |
-| `name` | **Type** | `kind.title` (equipment kind) |
-| `make` | **Make** | Inline `brand.title`, else `/equipment-brands` lookup via `brandId` or model's brand |
-| `model` | **Model** | `model.title`, else `/equipment-models` lookup |
-| `category` | **Category** | `/equipment-categories` lookup from category id |
-| `brandId`, `modelId`, `categoryId`, `status` | Not shown | Used for resolution / filtering |
-
-D4H equipment list rows often embed `category`, `model.brand`, etc. as **id-only references**
-(no title). The plugin resolves titles from the separate catalog endpoints during sync — same
-pattern as categories.
+Never holds the D4H token. Prefer `GET /api/d4h/members` via `std()` for cross-plugin sharing.
 
 ---
 
-## What is **not** stored
+## Server API
 
-- D4H bearer token (Preferences only)
-- Raw API responses
-- Separate copies of category / brand / model catalogs
-- Non-operational members or equipment
-- Equipment outside wanted categories (vehicles / UAS / tech litter)
-- Server-side Postgres rows (planned Phase 3.5, not built)
-- CloudTAK `ProfileConfig` / user profile
+| Method | Path | Auth | Role |
+|--------|------|------|------|
+| `GET` | `/api/d4h/config` | auth | Redacted config |
+| `PUT` | `/api/d4h/config` | system admin | Save token / interval / default groups |
+| `POST` | `/api/d4h/sync` | system admin | Pull D4H → Postgres |
+| `GET` | `/api/d4h/roster` | auth | Group-filtered full roster |
+| `GET` | `/api/d4h/members` | auth | Group-filtered members (`?ref=` / `?callsign=`) |
+| `GET` | `/api/d4h/equipment` | auth | Group-filtered equipment |
+| `GET` | `/api/d4h/meta` | auth | Last sync header |
 
----
-
-## UI (current)
-
-- **Personnel tab** — operational members only; columns Badge, Name, Position, Mobile; sort/filter.
-- **Equipment tab** — operational equipment in wanted categories; columns ID, Type, Make, Model, Category; sort/filter; category discovery badges.
-- **Sync status / warnings** — dismissible alerts.
-- **Plugin icon** — `lib/assets/d4h_personnel_logo.svg` via `lib/D4HIcon.vue`.
+Visibility: row `groups` ∩ caller's active TAK groups. System/agency admins see all.
+v1 tagging: every row gets `d4h_config.default_groups`.
 
 ---
 
-## How other plugins access it today
-
-Every CloudTAK plugin shares one runtime — the same Pinia and Dexie `db`:
+## How other plugins should consume it
 
 ```ts
-import KV from '../../src/base/kv.ts';
-const roster = JSON.parse(await KV.value('d4h:roster')); // D4HRoster
-// or reactive: KV.liveFrom('d4h:roster')
+import { std } from '../../src/std.ts';
+const { members } = await std('/api/d4h/members') as { members: D4HMember[] };
 ```
-
-Import shapes from `lib/d4h-types.ts`.  
-**Caveat:** unauthenticated, unfiltered cache — whatever was synced on that device is readable.
-
-**Planned but not built** (`docs/PLAN.md` §4A / §5, Phase 3.5): Postgres-backed
-`GET /api/d4h/members`, filtered by caller TAK groups; `db.kv` demoted to non-authoritative
-cache; `groups[]` populated server-side.
 
 ---
 
@@ -177,21 +118,9 @@ cache; `groups[]` populated server-side.
 
 | Area | State |
 |------|-------|
-| Members | Working. Operational-only. Pagination 0-indexed. |
-| Equipment | Working. Operational-only + category filter (vehicles / UAS / tech litter). Make/Model via brands/models lookups. |
-| Qualifications | Working. Joined onto members by `memberId`. |
-| Cross-plugin sharing | Raw `db.kv` cache only; no access control yet. |
-| Server route / TAK-group access control | Not built (planned Phase 3.5). |
-
----
-
-## Notable fixes & schema notes
-
-- **Pagination off-by-one:** D4H list endpoints are 0-indexed; loop starts at `page=0` with 1-indexed fallback.
-- **Operational personnel:** server-side `?status=OPERATIONAL` with client-side fallback.
-- **Operational equipment:** status must be `OPERATIONAL` or `OPERATIONAL*`.
-- **Equipment has no top-level name:** `name` (Type) comes from `kind.title`.
-- **Category id-only:** resolved via `/equipment-categories`.
-- **Brand id-only on list rows:** Make resolved via `/equipment-brands` (and optionally via model → brandId).
-- **Model title:** from inline `model.title` or `/equipment-models` lookup.
-- **Category discovery:** every operational category title reported in `meta.equipmentCategories`; warns if wanted keywords match nothing.
+| Members / equipment / quals / resources / incidents | Working (client + server sync) |
+| Hybrid Postgres + periodic sync | Built (`server/plugin-d4h.ts`, `server/d4h-sync.ts`) |
+| TAK-group access control | Built via `default_groups` + caller group intersect |
+| Cross-plugin sharing | Prefer `/api/d4h/members`; `db.kv` is a view cache |
+| Per-member D4H→TAK group mapping | Deferred |
+| Client-direct fallback | Still available when server route/token absent |
