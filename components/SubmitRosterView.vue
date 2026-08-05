@@ -1,46 +1,41 @@
 <template>
     <div class='d-flex flex-column'>
-        <h5 class='mb-3'>
-            Submit roster to D4H
-        </h5>
-
-        <div
+        <TablerInlineAlert
             v-if='!config'
-            class='alert alert-warning py-2 small'
-        >
-            D4H connection is not configured yet. Open the connection settings and run
-            <strong>Test connection</strong> first.
-        </div>
+            severity='warning'
+            title='D4H connection is not configured yet.'
+            description='Open the connection settings and run Test connection first.'
+        />
 
-        <template v-else>
-            <div class='mb-3'>
-                <label class='form-label small fw-semibold'>
-                    Incident
-                    <span class='text-muted fw-normal'>(from last sync)</span>
-                </label>
-                <select
-                    v-model='selectedIncidentId'
-                    class='form-select form-select-sm'
+        <TablerBorder
+            v-else
+            class='cloudtak-accent text-white'
+            :fill-height='false'
+            :shadow='false'
+            gap='sm'
+        >
+            <template #label>
+                <p class='text-uppercase text-white-50 small mb-0'>
+                    Submit Roster
+                </p>
+            </template>
+
+            <div>
+                <TablerEnum
+                    v-model='incidentEnumModel'
+                    label='Incident'
+                    :options='incidentEnumOptions'
                     :disabled='!incidentOptions.length'
-                    @change='onIncidentChange'
-                >
-                    <option
-                        v-if='!incidentOptions.length'
-                        :value='undefined'
-                    >
-                        No incidents — run Sync now
-                    </option>
-                    <option
-                        v-for='opt in incidentOptions'
-                        :key='opt.id'
-                        :value='opt.id'
-                    >
-                        {{ opt.label }}
-                    </option>
-                </select>
+                />
                 <div
-                    v-if='selectedIncident'
-                    class='form-text small'
+                    v-if='!incidentOptions.length'
+                    class='form-text small text-white-50'
+                >
+                    No incidents — run Sync now
+                </div>
+                <div
+                    v-else-if='selectedIncident'
+                    class='form-text small text-white-50'
                 >
                     Activity ID {{ selectedIncident.id }}
                     <span v-if='selectedIncident.startsAt'>
@@ -53,47 +48,39 @@
                 </div>
             </div>
 
-            <div
+            <TablerInlineAlert
                 v-if='selectedIncident?.published === true'
-                class='alert alert-warning py-2 small mb-3'
-            >
-                This incident is <strong>published</strong> in D4H. Attendance cannot be added or
-                changed after publish. Submit the roster <em>before</em> publishing the incident,
-                or unpublish it in D4H Team Manager first.
-            </div>
+                severity='warning'
+                title='This incident is published in D4H.'
+                description='Attendance cannot be added or changed after publish. Submit the roster before publishing the incident, or unpublish it in D4H Team Manager first.'
+            />
 
-            <div class='mb-3'>
-                <label class='form-label small fw-semibold'>
-                    DataSync mission
-                    <span class='text-muted fw-normal'>(org chart source)</span>
-                </label>
-                <select
-                    v-model='selectedMissionGuid'
-                    class='form-select form-select-sm'
+            <div>
+                <TablerEnum
+                    v-model='missionEnumModel'
+                    label='DataSync mission'
+                    :options='missionEnumOptions'
                     :disabled='!missions.length'
-                    @change='loadOrgChart'
+                />
+                <div
+                    v-if='!missions.length'
+                    class='form-text small text-white-50'
                 >
-                    <option
-                        v-if='!missions.length'
-                        :value='undefined'
-                    >
-                        No loaded missions
-                    </option>
-                    <option
-                        v-for='m in missions'
-                        :key='m.guid'
-                        :value='m.guid'
-                    >
-                        {{ m.name }}{{ m.guid === linkedMissionGuid ? ' (linked)' : '' }}
-                    </option>
-                </select>
-                <div class='form-text small'>
+                    No loaded missions
+                </div>
+                <div
+                    v-else-if='linkedMissionName'
+                    class='form-text small text-white-50'
+                >
+                    Linked mission for this incident: {{ linkedMissionName }}
+                </div>
+                <div class='form-text small text-white-50'>
                     Roster is read from the incident-manager Assignments org chart
                     (<code>assignments_org_chart</code> in mission_schema.json).
                 </div>
             </div>
 
-            <div class='d-flex gap-2 flex-wrap mb-3'>
+            <div class='d-flex gap-2 flex-wrap'>
                 <button
                     type='button'
                     class='btn btn-outline-secondary btn-sm'
@@ -108,29 +95,23 @@
                 </button>
             </div>
 
-            <div
+            <TablerInlineAlert
                 v-if='chartError'
-                class='alert alert-danger py-2 small'
-            >
-                {{ chartError }}
-            </div>
-
-            <div
+                severity='danger'
+                :title='chartError'
+            />
+            <TablerInlineAlert
                 v-else-if='chartLoaded && !rosterRows.length'
-                class='alert alert-warning py-2 small'
-            >
-                No D4H members on the org chart for this mission. Add personnel in the
-                incident-manager Assignments tab first.
-            </div>
+                severity='warning'
+                title='No D4H members on the org chart for this mission.'
+                description='Add personnel in the incident-manager Assignments tab first.'
+            />
 
-            <div
-                v-if='rosterRows.length'
-                class='mb-3'
-            >
+            <div v-if='rosterRows.length'>
                 <div class='small fw-semibold mb-2'>
                     Roster preview ({{ rosterRows.length }} member{{ rosterRows.length === 1 ? '' : 's' }})
                 </div>
-                <div class='table-responsive border rounded'>
+                <div class='cloudtak-accent border rounded-3 table-responsive'>
                     <table class='table table-sm table-striped mb-0 small'>
                         <thead>
                             <tr>
@@ -174,26 +155,14 @@
                 {{ submitting ? 'Submitting…' : 'Submit roster' }}
             </button>
 
-            <div
-                v-if='result'
-                class='alert mt-3 small'
-                :class='result.ok ? "alert-success" : "alert-danger"'
-            >
-                <div
-                    v-if='result.ok'
-                    class='fw-semibold'
-                >
-                    Roster submitted for activity {{ selectedIncident?.id }}.
-                </div>
-                <div
-                    v-else
-                    class='fw-semibold'
-                >
-                    Submit failed. {{ result.message }}
-                </div>
+            <div v-if='result'>
+                <TablerInlineAlert
+                    :severity='result.ok ? "success" : "danger"'
+                    :title='result.ok ? `Roster submitted for activity ${selectedIncident?.id}.` : `Submit failed. ${result.message}`'
+                />
                 <ul
                     v-if='result.details.length'
-                    class='mb-0 mt-2 ps-3'
+                    class='mb-0 mt-2 ps-3 small'
                 >
                     <li
                         v-for='(line, i) in result.details'
@@ -203,12 +172,13 @@
                     </li>
                 </ul>
             </div>
-        </template>
+        </TablerBorder>
     </div>
 </template>
 
 <script setup lang='ts'>
 import { computed, onMounted, ref, watch } from 'vue';
+import { TablerBorder, TablerEnum, TablerInlineAlert } from '@tak-ps/vue-tabler';
 import { loadConfig, type D4HConfig } from '../lib/d4h-config.ts';
 import { loadCachedRoster } from '../lib/d4h-roster.ts';
 import type { D4HIncident, D4HMember, D4HRoster } from '../lib/d4h-types.ts';
@@ -259,8 +229,30 @@ const incidentOptions = computed(() => {
         }));
 });
 
+const incidentEnumOptions = computed(() => incidentOptions.value.map((o) => o.label));
+const incidentEnumModel = computed({
+    get: () => incidentOptions.value.find((o) => o.id === selectedIncidentId.value)?.label ?? '',
+    set: (label: string) => {
+        selectedIncidentId.value = incidentOptions.value.find((o) => o.label === label)?.id;
+        onIncidentChange();
+    },
+});
+
 const selectedIncident = computed(() =>
     (props.roster ?? localRoster.value)?.incidents?.find((i) => i.id === selectedIncidentId.value) ?? null,
+);
+
+const missionEnumOptions = computed(() => missions.value.map((m) => m.name));
+const missionEnumModel = computed({
+    get: () => missions.value.find((m) => m.guid === selectedMissionGuid.value)?.name ?? '',
+    set: (name: string) => {
+        selectedMissionGuid.value = missions.value.find((m) => m.name === name)?.guid;
+        void loadOrgChart();
+    },
+});
+
+const linkedMissionName = computed(() =>
+    missions.value.find((m) => m.guid === linkedMissionGuid.value)?.name,
 );
 
 const memberById = computed(() => {

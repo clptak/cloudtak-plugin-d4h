@@ -1,5 +1,5 @@
 <template>
-    <div class='d4h-pane h-100 w-100'>
+    <div class='d4h-pane px-3 py-3'>
         <div
             v-if='!loaded'
             class='d-flex align-items-center justify-content-center p-4 text-muted'
@@ -15,10 +15,7 @@
         />
 
         <!-- Roster pane -->
-        <div
-            v-else
-            class='p-3'
-        >
+        <div v-else>
             <div class='d-flex align-items-center gap-2 flex-wrap mb-3'>
                 <button
                     class='btn btn-primary btn-sm'
@@ -62,76 +59,57 @@
 
             <div
                 v-if='syncStatus'
-                class='alert alert-dismissible fade show small'
-                :class='syncStatus.kind === "ok" ? "alert-success" : syncStatus.kind === "err" ? "alert-danger" : "alert-info"'
+                class='mb-2'
             >
+                <TablerInlineAlert
+                    :severity='syncStatus.kind === "ok" ? "success" : syncStatus.kind === "err" ? "danger" : "info"'
+                    :title='syncStatus.title'
+                    :description='syncStatus.detail'
+                />
                 <button
                     type='button'
-                    class='btn-close'
-                    aria-label='Close'
+                    class='btn btn-sm btn-link px-0'
                     @click='syncStatus = null'
-                />
-                <div class='fw-semibold'>
-                    {{ syncStatus.title }}
-                </div>
-                <div
-                    v-if='syncStatus.detail'
-                    style='white-space:pre-wrap'
                 >
-                    {{ syncStatus.detail }}
-                </div>
-            </div>
-
-            <div
-                v-if='meta?.warnings?.length && !warningsDismissed'
-                class='alert alert-warning alert-dismissible fade show small'
-            >
-                <button
-                    type='button'
-                    class='btn-close'
-                    aria-label='Close'
-                    @click='warningsDismissed = true'
-                />
-                <div class='fw-semibold mb-1'>
-                    Sync warnings ({{ meta.warnings.length }})
-                </div>
-                <ul class='mb-0 ps-3'>
-                    <li
-                        v-for='(w, i) in meta.warnings'
-                        :key='i'
-                    >
-                        {{ w }}
-                    </li>
-                </ul>
-            </div>
-
-            <div
-                class='d-flex border-bottom flex-shrink-0'
-                :class='activeMainTab === "incidents" ? "mb-3" : "mb-0"'
-            >
-                <button
-                    v-for='tab in mainTabs'
-                    :key='tab.key'
-                    type='button'
-                    class='flex-fill btn btn-sm rounded-0 py-2 border-0'
-                    :class='activeMainTab === tab.key ? "bg-primary text-white fw-semibold" : "text-muted"'
-                    @click='activeMainTab = tab.key'
-                >
-                    {{ tab.label }}
+                    Dismiss
                 </button>
             </div>
 
             <div
+                v-if='meta?.warnings?.length && !warningsDismissed'
+                class='mb-2'
+            >
+                <TablerInlineAlert
+                    severity='warning'
+                    :title='`Sync warnings (${meta.warnings.length})`'
+                    :description='meta.warnings.join("; ")'
+                />
+                <button
+                    type='button'
+                    class='btn btn-sm btn-link px-0'
+                    @click='warningsDismissed = true'
+                >
+                    Dismiss
+                </button>
+            </div>
+
+            <TablerPillGroup
+                v-model='activeMainTab'
+                :options='mainTabOptions'
+                name='d4h-main-tabs'
+            />
+
+            <div
                 v-if='activeMainTab === "resources"'
-                class='d-flex flex-wrap gap-1 mb-3 mt-2 flex-shrink-0'
+                class='d-flex flex-wrap gap-1 mb-2 mt-2'
             >
                 <button
-                    v-for='tab in resourcesSubTabs'
-                    :key='tab.key'
+                    v-for='tab in resourcesSubTabOptions'
+                    :key='tab.value'
                     type='button'
                     class='btn btn-sm btn-outline-warning'
-                    :class='{ active: resourcesSubTab === tab.key }'
-                    @click='resourcesSubTab = tab.key'
+                    :class='{ active: resourcesSubTab === tab.value }'
+                    @click='resourcesSubTab = tab.value'
                 >
                     {{ tab.label }}
                 </button>
@@ -139,57 +117,55 @@
 
             <div
                 v-else-if='activeMainTab === "submit-d4h"'
-                class='d-flex flex-wrap gap-1 mb-3 mt-2 flex-shrink-0'
+                class='d-flex flex-wrap gap-1 mb-2 mt-2'
             >
                 <button
-                    v-for='tab in submitSubTabs'
-                    :key='tab.key'
+                    v-for='tab in submitSubTabOptions'
+                    :key='tab.value'
                     type='button'
                     class='btn btn-sm btn-outline-warning'
-                    :class='{ active: submitSubTab === tab.key }'
-                    @click='submitSubTab = tab.key'
+                    :class='{ active: submitSubTab === tab.value }'
+                    @click='submitSubTab = tab.value'
                 >
                     {{ tab.label }}
                 </button>
             </div>
 
             <!-- Personnel -->
-            <div v-if='activeContentKey === "personnel"'>
-                <div
+            <div
+                v-if='activeContentKey === "personnel"'
+                class='mt-2'
+            >
+                <TablerBorder
                     v-if='roster?.members?.length'
-                    class='card mb-3'
+                    class='cloudtak-accent text-white mb-3'
+                    :fill-height='false'
+                    :shadow='false'
+                    gap='sm'
                 >
-                    <div class='card-header py-1 px-2 d-flex align-items-center gap-2 flex-wrap'>
-                        <span class='small fw-semibold'>
+                    <template #label>
+                        <p class='text-uppercase text-white-50 small mb-0'>
                             Personnel ({{ filteredMembers.length }}<span
                                 v-if='filteredMembers.length !== roster.members.length'
-                                class='text-muted fw-normal'
                             > of {{ roster.members.length }}</span>)
-                        </span>
-                        <select
-                            v-model='qualFilter'
-                            class='form-select form-select-sm ms-auto'
-                            style='max-width:220px'
-                            title='Filter by qualification'
-                        >
-                            <option value=''>
-                                Any qualification
-                            </option>
-                            <option
-                                v-for='name in qualificationOptions'
-                                :key='name'
-                                :value='name'
-                            >
-                                {{ name }}
-                            </option>
-                        </select>
-                        <input
-                            v-model='filter'
-                            type='search'
-                            class='form-control form-control-sm'
-                            style='max-width:240px'
-                            placeholder='Filter by name, badge, position, mobile…'
-                        >
+                        </p>
+                    </template>
+                    <div class='row g-2'>
+                        <div class='col-md-5'>
+                            <TablerEnum
+                                v-model='qualFilterModel'
+                                label='Qualification'
+                                :options='qualFilterOptions'
+                            />
+                        </div>
+                        <div class='col-md-7'>
+                            <TablerInput
+                                v-model='filter'
+                                label='Filter'
+                                icon='search'
+                                placeholder='Filter by name, badge, position, mobile…'
+                            />
+                        </div>
                     </div>
                     <div class='table-responsive'>
                         <table class='table table-sm table-hover mb-0 small'>
@@ -287,7 +263,7 @@
                             </tbody>
                         </table>
                     </div>
-                </div>
+                </TablerBorder>
                 <div
                     v-else
                     class='text-muted small text-center py-4'
@@ -297,32 +273,36 @@
             </div>
 
             <!-- Equipment -->
-            <div v-else-if='activeContentKey === "equipment"'>
-                <div
+            <div
+                v-else-if='activeContentKey === "equipment"'
+                class='mt-2'
+            >
+                <TablerBorder
                     v-if='roster?.equipment?.length || meta?.equipmentCategories?.length'
-                    class='card mb-3'
+                    class='cloudtak-accent text-white mb-3'
+                    :fill-height='false'
+                    :shadow='false'
+                    gap='sm'
                 >
-                    <div class='card-header py-1 px-2 d-flex align-items-center gap-2 flex-wrap'>
-                        <span class='small fw-semibold'>
+                    <template #label>
+                        <p class='text-uppercase text-white-50 small mb-0'>
                             Equipment ({{ filteredEquipment.length }}<span
                                 v-if='filteredEquipment.length !== (roster?.equipment?.length ?? 0)'
-                                class='text-muted fw-normal'
                             > of {{ roster?.equipment?.length ?? 0 }}</span>)
-                        </span>
-                        <input
-                            v-model='equipFilter'
-                            type='search'
-                            class='form-control form-control-sm ms-auto'
-                            style='max-width:240px'
-                            placeholder='Filter by id, type, make, model, category…'
-                        >
-                    </div>
+                        </p>
+                    </template>
+                    <TablerInput
+                        v-model='equipFilter'
+                        label='Filter'
+                        icon='search'
+                        placeholder='Filter by id, type, make, model, category…'
+                    />
 
                     <div
                         v-if='meta?.equipmentCategories?.length'
-                        class='px-2 py-1 small border-bottom d-flex flex-wrap gap-1 align-items-center'
+                        class='small d-flex flex-wrap gap-1 align-items-center'
                     >
-                        <span class='text-muted me-1'>Categories found:</span>
+                        <span class='text-white-50 me-1'>Categories found:</span>
                         <span
                             v-for='c in meta.equipmentCategories'
                             :key='c.title'
@@ -417,7 +397,7 @@
                             </tbody>
                         </table>
                     </div>
-                </div>
+                </TablerBorder>
                 <div
                     v-else
                     class='text-muted small text-center py-4'
@@ -427,26 +407,30 @@
             </div>
 
             <!-- External resources (Intelligence → Resources) -->
-            <div v-else-if='activeContentKey === "resources"'>
-                <div
+            <div
+                v-else-if='activeContentKey === "resources"'
+                class='mt-2'
+            >
+                <TablerBorder
                     v-if='roster?.externalResources?.length'
-                    class='card mb-3'
+                    class='cloudtak-accent text-white mb-3'
+                    :fill-height='false'
+                    :shadow='false'
+                    gap='sm'
                 >
-                    <div class='card-header py-1 px-2 d-flex align-items-center gap-2 flex-wrap'>
-                        <span class='small fw-semibold'>
+                    <template #label>
+                        <p class='text-uppercase text-white-50 small mb-0'>
                             External resources ({{ filteredExternalResources.length }}<span
                                 v-if='filteredExternalResources.length !== (roster?.externalResources?.length ?? 0)'
-                                class='text-muted fw-normal'
                             > of {{ roster?.externalResources?.length ?? 0 }}</span>)
-                        </span>
-                        <input
-                            v-model='resourceFilter'
-                            type='search'
-                            class='form-control form-control-sm ms-auto'
-                            style='max-width:240px'
-                            placeholder='Filter by id or agency name…'
-                        >
-                    </div>
+                        </p>
+                    </template>
+                    <TablerInput
+                        v-model='resourceFilter'
+                        label='Filter'
+                        icon='search'
+                        placeholder='Filter by id or agency name…'
+                    />
                     <div class='table-responsive'>
                         <table class='table table-sm table-hover mb-0 small'>
                             <thead class='sticky-top bg-body'>
@@ -494,7 +478,7 @@
                             </tbody>
                         </table>
                     </div>
-                </div>
+                </TablerBorder>
                 <div
                     v-else
                     class='text-muted small text-center py-4'
@@ -504,26 +488,30 @@
             </div>
 
             <!-- Incidents (last 30 days) -->
-            <div v-else-if='activeContentKey === "incidents"'>
-                <div
+            <div
+                v-else-if='activeContentKey === "incidents"'
+                class='mt-2'
+            >
+                <TablerBorder
                     v-if='roster?.incidents?.length'
-                    class='card mb-3'
+                    class='cloudtak-accent text-white mb-3'
+                    :fill-height='false'
+                    :shadow='false'
+                    gap='sm'
                 >
-                    <div class='card-header py-1 px-2 d-flex align-items-center gap-2 flex-wrap'>
-                        <span class='small fw-semibold'>
+                    <template #label>
+                        <p class='text-uppercase text-white-50 small mb-0'>
                             Incidents — last 30 days ({{ filteredIncidents.length }}<span
                                 v-if='filteredIncidents.length !== (roster?.incidents?.length ?? 0)'
-                                class='text-muted fw-normal'
                             > of {{ roster?.incidents?.length ?? 0 }}</span>)
-                        </span>
-                        <input
-                            v-model='incidentFilter'
-                            type='search'
-                            class='form-control form-control-sm ms-auto'
-                            style='max-width:280px'
-                            placeholder='Filter by ref, title, tracking #…'
-                        >
-                    </div>
+                        </p>
+                    </template>
+                    <TablerInput
+                        v-model='incidentFilter'
+                        label='Filter'
+                        icon='search'
+                        placeholder='Filter by ref, title, tracking #…'
+                    />
                     <div class='table-responsive'>
                         <table class='table table-sm table-hover mb-0 small'>
                             <thead class='sticky-top bg-body'>
@@ -605,11 +593,11 @@
                                     <td>
                                         <span
                                             v-if='inc.published === true'
-                                            class='badge bg-success'
+                                            class='badge bg-success text-white'
                                         >Yes</span>
                                         <span
                                             v-else-if='inc.published === false'
-                                            class='badge bg-secondary'
+                                            class='badge bg-secondary text-white'
                                         >No</span>
                                         <span
                                             v-else
@@ -628,7 +616,7 @@
                             </tbody>
                         </table>
                     </div>
-                </div>
+                </TablerBorder>
                 <div
                     v-else
                     class='text-muted small text-center py-4'
@@ -638,23 +626,32 @@
             </div>
 
             <!-- Submit incident -->
-            <div v-else-if='activeContentKey === "submit"'>
+            <div
+                v-else-if='activeContentKey === "submit"'
+                class='mt-2'
+            >
                 <SubmitIncidentView @incident-created='onIncidentCreated' />
             </div>
 
             <!-- Submit roster -->
-            <div v-else-if='activeContentKey === "submit-roster"'>
+            <div
+                v-else-if='activeContentKey === "submit-roster"'
+                class='mt-2'
+            >
                 <SubmitRosterView :roster='roster' />
             </div>
 
             <!-- Submit subject -->
-            <div v-else-if='activeContentKey === "submit-subject"'>
+            <div
+                v-else-if='activeContentKey === "submit-subject"'
+                class='mt-2'
+            >
                 <SubmitSubjectView :roster='roster' />
             </div>
 
             <div
                 v-if='showConfig'
-                class='border-top pt-3'
+                class='border-top pt-3 mt-3'
             >
                 <ConfigView
                     @saved='onConfigSaved'
@@ -668,6 +665,13 @@
 
 <script setup lang='ts'>
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import {
+    TablerBorder,
+    TablerEnum,
+    TablerInlineAlert,
+    TablerInput,
+    TablerPillGroup,
+} from '@tak-ps/vue-tabler';
 import ConfigView from './ConfigView.vue';
 import SubmitIncidentView from './SubmitIncidentView.vue';
 import SubmitRosterView from './SubmitRosterView.vue';
@@ -707,46 +711,45 @@ const incidentSortDir = ref<'asc' | 'desc'>('desc');
 const syncStatus = ref<{ kind: 'ok' | 'err' | 'info'; title: string; detail?: string } | null>(null);
 const warningsDismissed = ref(false);
 
-type MainTabKey = 'resources' | 'incidents' | 'submit-d4h';
 type ResourcesSubKey = 'personnel' | 'equipment' | 'resources';
 type SubmitSubKey = 'submit' | 'submit-roster' | 'submit-subject';
 type ContentTabKey = ResourcesSubKey | 'incidents' | SubmitSubKey;
 
-const activeMainTab = ref<MainTabKey>('resources');
-const resourcesSubTab = ref<ResourcesSubKey>('personnel');
-const submitSubTab = ref<SubmitSubKey>('submit');
+const activeMainTab = ref<string>('resources');
+const resourcesSubTab = ref<string>('personnel');
+const submitSubTab = ref<string>('submit');
 
 const activeContentKey = computed<ContentTabKey>(() => {
     if (activeMainTab.value === 'incidents') return 'incidents';
-    if (activeMainTab.value === 'resources') return resourcesSubTab.value;
-    return submitSubTab.value;
+    if (activeMainTab.value === 'resources') return resourcesSubTab.value as ResourcesSubKey;
+    return submitSubTab.value as SubmitSubKey;
 });
 
-const mainTabs = computed(() => [
-    { key: 'resources' as const, label: 'Resources' },
-    { key: 'incidents' as const, label: 'Incidents' },
-    { key: 'submit-d4h' as const, label: 'Submit to D4H' },
+const mainTabOptions = computed(() => [
+    { value: 'resources', label: 'Resources' },
+    { value: 'incidents', label: 'Incidents' },
+    { value: 'submit-d4h', label: 'Submit to D4H' },
 ]);
 
-const resourcesSubTabs = computed(() => [
+const resourcesSubTabOptions = computed(() => [
     {
-        key:   'personnel' as const,
+        value: 'personnel',
         label: `Personnel (${meta.value?.memberCount ?? roster.value?.members.length ?? 0})`,
     },
     {
-        key:   'equipment' as const,
+        value: 'equipment',
         label: `Equipment (${meta.value?.equipmentCount ?? roster.value?.equipment.length ?? 0})`,
     },
     {
-        key:   'resources' as const,
+        value: 'resources',
         label: `Resources (${meta.value?.externalResourceCount ?? roster.value?.externalResources?.length ?? 0})`,
     },
 ]);
 
-const submitSubTabs = computed(() => [
-    { key: 'submit' as const, label: 'Submit Incident' },
-    { key: 'submit-roster' as const, label: 'Submit Roster' },
-    { key: 'submit-subject' as const, label: 'Submit Subject' },
+const submitSubTabOptions = computed(() => [
+    { value: 'submit', label: 'Submit Incident' },
+    { value: 'submit-roster', label: 'Submit Roster' },
+    { value: 'submit-subject', label: 'Submit Subject' },
 ]);
 
 const serverReady = computed(() => !!serverCfg.value?.tokenConfigured);
@@ -775,6 +778,15 @@ const qualificationOptions = computed(() => {
         }
     }
     return [...names].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+});
+
+const qualFilterOptions = computed(() => ['Any qualification', ...qualificationOptions.value]);
+
+const qualFilterModel = computed({
+    get: () => qualFilter.value || 'Any qualification',
+    set: (v: string) => {
+        qualFilter.value = v === 'Any qualification' ? '' : v;
+    },
 });
 
 const filteredMembers = computed(() => {
@@ -1148,3 +1160,27 @@ function onConfigCleared(): void {
     }
 }
 </script>
+
+<style scoped>
+.d4h-pane {
+    /* Match Mission Info insets; Tabler form surfaces are primary-tinted */
+    --tabler-input-bg: var(--cloudtak-inset-bg);
+    --tblr-bg-forms: var(--cloudtak-inset-bg);
+}
+
+.d4h-pane :deep(.cloudtak-bg),
+.d4h-pane :deep(.card) {
+    background-color: var(--cloudtak-inset-bg) !important;
+    border-color: var(--cloudtak-inset-border);
+}
+
+.d4h-pane :deep(.card-header) {
+    background-color: transparent !important;
+}
+
+/* Theme table cells can mute badge text; keep success/secondary pills readable */
+.d4h-pane :deep(.badge.bg-success),
+.d4h-pane :deep(.badge.bg-secondary) {
+    color: #fff !important;
+}
+</style>

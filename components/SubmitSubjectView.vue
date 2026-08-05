@@ -1,42 +1,30 @@
 <template>
     <div class='d-flex flex-column'>
         <h5 class='mb-3'>
-            Submit subject to D4H
+            Submit Subject To D4H
         </h5>
 
-        <div
+        <TablerInlineAlert
             v-if='!config'
-            class='alert alert-warning py-2 small'
-        >
-            D4H connection is not configured yet. Open the connection settings and run
-            <strong>Test connection</strong> first.
-        </div>
+            severity='warning'
+            title='D4H Not Configured'
+            description='Open the connection settings and run Test Connection first.'
+        />
 
         <template v-else>
-            <div class='mb-3'>
-                <label class='form-label small fw-semibold'>
-                    Incident
-                    <span class='text-muted fw-normal'>(from last sync)</span>
-                </label>
-                <select
-                    v-model.number='selectedIncidentId'
-                    class='form-select form-select-sm'
+            <TablerBorder
+                class='cloudtak-accent text-white'
+                :fill-height='false'
+                :shadow='false'
+                gap='sm'
+            >
+                <TablerEnum
+                    v-model='incidentSelection'
+                    label='Incident'
+                    description='From last sync.'
+                    :options='incidentOptionsOrPlaceholder'
                     :disabled='!incidentOptions.length'
-                >
-                    <option
-                        v-if='!incidentOptions.length'
-                        :value='undefined'
-                    >
-                        No incidents — run Sync now
-                    </option>
-                    <option
-                        v-for='opt in incidentOptions'
-                        :key='opt.id'
-                        :value='opt.id'
-                    >
-                        {{ opt.label }}
-                    </option>
-                </select>
+                />
                 <div
                     v-if='selectedIncident'
                     class='form-text small'
@@ -47,526 +35,326 @@
                         class='badge bg-warning text-dark ms-1'
                     >Published</span>
                 </div>
-            </div>
 
-            <div class='mb-3'>
-                <label class='form-label small fw-semibold'>
-                    DataSync mission
-                    <span class='text-muted fw-normal'>(subject information source)</span>
-                </label>
-                <select
-                    v-model='selectedMissionGuid'
-                    class='form-select form-select-sm'
+                <TablerEnum
+                    v-model='missionSelection'
+                    label='DataSync Mission'
+                    description='Subject information source.'
+                    :options='missionOptionsOrPlaceholder'
                     :disabled='!missions.length'
-                    @change='loadSubjects'
-                >
-                    <option
-                        v-if='!missions.length'
-                        :value='undefined'
-                    >
-                        No loaded missions
-                    </option>
-                    <option
-                        v-for='m in missions'
-                        :key='m.guid'
-                        :value='m.guid'
-                    >
-                        {{ m.name }}{{ m.guid === linkedMissionGuid ? ' (linked)' : '' }}
-                    </option>
-                </select>
-            </div>
+                />
 
-            <div class='d-flex gap-2 flex-wrap mb-3'>
-                <select
-                    v-model='selectedSubjectCaseId'
-                    class='form-select form-select-sm'
-                    style='max-width:12rem'
-                    :disabled='!subjects.length'
-                    @change='applySelectedSubject'
-                >
-                    <option
-                        v-if='!subjects.length'
-                        value=''
-                    >
-                        No subjects in mission
-                    </option>
-                    <option
-                        v-for='s in subjects'
-                        :key='s.subjectCaseID'
-                        :value='s.subjectCaseID'
-                    >
-                        Subject {{ displaySubjectNumber(s.subjectCaseID) }}{{ s.subjectName ? ` — ${s.subjectName}` : '' }}
-                    </option>
-                </select>
-                <button
-                    type='button'
-                    class='btn btn-outline-secondary btn-sm'
-                    :disabled='!selectedMissionGuid || loadingSubjects'
-                    @click='loadSubjects'
-                >
-                    <span
-                        v-if='loadingSubjects'
-                        class='spinner-border spinner-border-sm me-1'
-                    />
-                    {{ loadingSubjects ? 'Loading…' : 'Reload subjects' }}
-                </button>
-            </div>
-
-            <div
-                v-if='loadError'
-                class='alert alert-danger py-2 small'
-            >
-                {{ loadError }}
-            </div>
-
-            <div
-                v-else-if='subjectsLoaded && !subjects.length'
-                class='alert alert-warning py-2 small mb-3'
-            >
-                No subject-information logs on this mission. Enter subject details in the
-                incident-manager Logger → Subject Information tab first.
-            </div>
-
-            <div
-                v-if='selectedIncident?.published === true'
-                class='alert alert-warning py-2 small mb-3'
-            >
-                This incident is <strong>published</strong> in D4H. Person-involved writes may be
-                rejected after publish. Use an unpublished incident or unpublish in D4H Team Manager.
-            </div>
-
-            <form
-                v-if='metadataLoaded'
-                @submit.prevent='onSubmit'
-            >
-                <div class='small fw-semibold mb-2 border-bottom pb-1'>
-                    Person involved
-                </div>
-
-                <div class='row g-2 mb-2'>
-                    <div class='col-md-6'>
-                        <label class='form-label small mb-1'>
-                            Name
-                        </label>
-                        <input
-                            v-model='form.name'
-                            type='text'
-                            class='form-control form-control-sm'
-                        >
-                    </div>
-                    <div class='col-md-3'>
-                        <label class='form-label small mb-1'>
-                            Date of birth
-                        </label>
-                        <input
-                            v-model='form.dateOfBirth'
-                            type='date'
-                            class='form-control form-control-sm'
-                            @change='onDobChange'
-                        >
-                    </div>
-                    <div class='col-md-3'>
-                        <label class='form-label small mb-1'>
-                            Age
-                        </label>
-                        <input
-                            v-model='form.age'
-                            type='number'
-                            min='0'
-                            class='form-control form-control-sm'
-                            :disabled='!!form.dateOfBirth'
-                        >
-                    </div>
-                </div>
-
-                <div class='row g-2 mb-2'>
-                    <div class='col-md-4'>
-                        <label class='form-label small mb-1'>
-                            Sex
-                        </label>
-                        <select
-                            v-model='form.sex'
-                            class='form-select form-select-sm'
-                        >
-                            <option value=''>
-                                —
-                            </option>
-                            <option
-                                v-for='o in SEX_OPTIONS'
-                                :key='o.value'
-                                :value='o.value'
-                            >
-                                {{ o.label }}
-                            </option>
-                        </select>
-                    </div>
-                    <div class='col-md-4'>
-                        <label class='form-label small mb-1'>
-                            Involvement type <span class='text-danger'>*</span>
-                        </label>
-                        <select
-                            v-model.number='form.involvementTypeId'
-                            class='form-select form-select-sm'
-                            required
-                            @change='form.outcomeId = ""'
-                        >
-                            <option :value='""'>
-                                Select type…
-                            </option>
-                            <option
-                                v-for='t in involvementTypes'
-                                :key='t.id'
-                                :value='t.id'
-                            >
-                                {{ t.title }}
-                            </option>
-                        </select>
-                    </div>
-                    <div class='col-md-4'>
-                        <label class='form-label small mb-1'>
-                            Outcome
-                            <span
-                                v-if='filteredOutcomes.length'
-                                class='text-danger'
-                            >*</span>
-                        </label>
-                        <select
-                            v-model.number='form.outcomeId'
-                            class='form-select form-select-sm'
-                            :disabled='!filteredOutcomes.length'
-                            :required='filteredOutcomes.length > 0'
-                        >
-                            <option :value='""'>
-                                —
-                            </option>
-                            <option
-                                v-for='o in filteredOutcomes'
-                                :key='o.id'
-                                :value='o.id'
-                            >
-                                {{ o.title }}
-                            </option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class='row g-2 mb-2'>
-                    <div class='col-md-4'>
-                        <label class='form-label small mb-1'>
-                            Nationality
-                        </label>
-                        <select
-                            v-model='form.nationality'
-                            class='form-select form-select-sm'
-                        >
-                            <option value=''>
-                                —
-                            </option>
-                            <option
-                                v-for='o in NATIONALITY_OPTIONS'
-                                :key='o.value'
-                                :value='o.value'
-                            >
-                                {{ o.label }}
-                            </option>
-                        </select>
-                    </div>
-                    <div class='col-md-4'>
-                        <label class='form-label small mb-1'>
-                            Area knowledge
-                        </label>
-                        <select
-                            v-model='form.areaKnowledge'
-                            class='form-select form-select-sm'
-                        >
-                            <option value=''>
-                                —
-                            </option>
-                            <option
-                                v-for='o in AREA_KNOWLEDGE_OPTIONS'
-                                :key='o.value'
-                                :value='o.value'
-                            >
-                                {{ o.label }}
-                            </option>
-                        </select>
-                    </div>
-                    <div class='col-md-4'>
-                        <label class='form-label small mb-1'>
-                            Cause
-                        </label>
-                        <select
-                            v-model='form.cause'
-                            class='form-select form-select-sm'
-                        >
-                            <option value=''>
-                                —
-                            </option>
-                            <option
-                                v-for='o in CAUSE_OPTIONS'
-                                :key='o.value'
-                                :value='o.value'
-                            >
-                                {{ o.label }}
-                            </option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class='row g-2 mb-2'>
-                    <div class='col-md-4'>
-                        <label class='form-label small mb-1'>
-                            Handover
-                        </label>
-                        <select
-                            v-model='form.handover'
-                            class='form-select form-select-sm'
-                        >
-                            <option value=''>
-                                —
-                            </option>
-                            <option
-                                v-for='o in HANDOVER_OPTIONS'
-                                :key='o.value'
-                                :value='o.value'
-                            >
-                                {{ o.label }}
-                            </option>
-                        </select>
-                    </div>
-                    <div class='col-md-4'>
-                        <label class='form-label small mb-1'>
-                            Spinal injury
-                        </label>
-                        <select
-                            v-model='form.spinalInjury'
-                            class='form-select form-select-sm'
-                        >
-                            <option value=''>
-                                —
-                            </option>
-                            <option
-                                v-for='o in SPINAL_INJURY_OPTIONS'
-                                :key='o.value'
-                                :value='o.value'
-                            >
-                                {{ o.label }}
-                            </option>
-                        </select>
-                    </div>
-                    <div class='col-md-4'>
-                        <label class='form-label small mb-1'>
-                            Transfer
-                        </label>
-                        <select
-                            v-model='form.transfer'
-                            class='form-select form-select-sm'
-                        >
-                            <option value=''>
-                                —
-                            </option>
-                            <option
-                                v-for='o in TRANSFER_OPTIONS'
-                                :key='o.value'
-                                :value='o.value'
-                            >
-                                {{ o.label }}
-                            </option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class='row g-2 mb-2'>
-                    <div class='col-md-6'>
-                        <label class='form-label small mb-1'>
-                            Assistance
-                        </label>
-                        <input
-                            v-model='form.assistance'
-                            type='text'
-                            class='form-control form-control-sm'
-                        >
-                    </div>
-                    <div class='col-md-6'>
-                        <label class='form-label small mb-1'>
-                            Contact
-                        </label>
-                        <input
-                            v-model='form.contact'
-                            type='text'
-                            class='form-control form-control-sm'
-                        >
-                    </div>
-                </div>
-
-                <div class='mb-3'>
-                    <label class='form-label small mb-1'>
-                        Involvement notes
-                    </label>
-                    <textarea
-                        v-model='form.involvementNotes'
-                        rows='4'
-                        class='form-control form-control-sm'
-                        placeholder='Pre-filled from mission subject details that have no direct D4H field'
-                    />
-                </div>
-
-                <div
-                    v-if='cfLoading'
-                    class='text-muted small mb-3'
-                >
-                    Loading custom fields…
-                </div>
-                <div
-                    v-else-if='customFields.length'
-                    class='mb-3'
-                >
-                    <div class='small fw-semibold mb-2 border-bottom pb-1'>
-                        Custom fields
-                    </div>
+                <div class='d-flex gap-2 flex-wrap align-items-end'>
                     <div
-                        v-for='f in customFields'
-                        :key='f.id'
-                        class='mb-2'
+                        class='flex-grow-1'
+                        style='max-width:16rem'
                     >
-                        <label class='form-label small mb-1'>
-                            {{ f.title }}
-                            <span
-                                v-if='f.mandatory'
-                                class='text-danger'
-                            >*</span>
-                        </label>
-
-                        <textarea
-                            v-if='f.type === "TEXT_AREA"'
-                            v-model='cfValues[f.id]'
-                            rows='3'
-                            class='form-control form-control-sm'
+                        <TablerEnum
+                            v-model='subjectSelection'
+                            label='Subject'
+                            :options='subjectOptionsOrPlaceholder'
+                            :disabled='!subjects.length'
                         />
-                        <select
-                            v-else-if='f.type === "SINGLE_CHOICE"'
-                            v-model='cfValues[f.id]'
-                            class='form-select form-select-sm'
-                        >
-                            <option :value='undefined'>
-                                —
-                            </option>
-                            <option
-                                v-for='o in f.options'
-                                :key='o.id'
-                                :value='o.id'
-                            >
-                                {{ o.label }}
-                            </option>
-                        </select>
-                        <select
-                            v-else-if='f.type === "MULTIPLE_CHOICE"'
-                            v-model='cfValues[f.id]'
-                            class='form-select form-select-sm'
-                            multiple
-                            size='4'
-                        >
-                            <option
-                                v-for='o in f.options'
-                                :key='o.id'
-                                :value='o.id'
-                            >
-                                {{ o.label }}
-                            </option>
-                        </select>
-                        <input
-                            v-else
-                            v-model='cfValues[f.id]'
-                            :type='inputTypeFor(f.type)'
-                            class='form-control form-control-sm'
-                        >
+                    </div>
+                    <button
+                        type='button'
+                        class='btn btn-outline-secondary btn-sm'
+                        :disabled='!selectedMissionGuid || loadingSubjects'
+                        @click='loadSubjects'
+                    >
+                        <span
+                            v-if='loadingSubjects'
+                            class='spinner-border spinner-border-sm me-1'
+                        />
+                        {{ loadingSubjects ? 'Loading…' : 'Reload Subjects' }}
+                    </button>
+                </div>
 
-                        <div
-                            v-if='f.hint'
-                            class='form-text small'
-                        >
-                            {{ f.hint }}
+                <TablerInlineAlert
+                    v-if='loadError'
+                    severity='danger'
+                    title='Load Failed'
+                    :description='loadError'
+                />
+                <TablerInlineAlert
+                    v-else-if='subjectsLoaded && !subjects.length'
+                    severity='warning'
+                    title='No Subject Logs'
+                    description='No subject-information logs on this mission. Enter subject details in the incident-manager Logger → Subject Information tab first.'
+                />
+
+                <TablerInlineAlert
+                    v-if='selectedIncident?.published === true'
+                    severity='warning'
+                    title='Incident Published'
+                    description='Person-involved writes may be rejected after publish. Use an unpublished incident or unpublish in D4H Team Manager.'
+                />
+
+                <form
+                    v-if='metadataLoaded'
+                    @submit.prevent='onSubmit'
+                >
+                    <p class='text-uppercase text-white-50 small mb-2'>
+                        Person Involved
+                    </p>
+
+                    <div class='row g-2 mb-2'>
+                        <div class='col-md-6'>
+                            <TablerInput
+                                v-model='form.name'
+                                label='Name'
+                            />
+                        </div>
+                        <div class='col-md-3'>
+                            <TablerInput
+                                v-model='form.dateOfBirth'
+                                type='date'
+                                label='Date Of Birth'
+                            />
+                        </div>
+                        <div class='col-md-3'>
+                            <TablerInput
+                                v-model='form.age'
+                                label='Age'
+                                :disabled='!!form.dateOfBirth'
+                            />
                         </div>
                     </div>
-                </div>
+
+                    <div class='row g-2 mb-2'>
+                        <div class='col-md-4'>
+                            <TablerEnum
+                                v-model='sexSelection'
+                                label='Sex'
+                                :options='sexOptions'
+                            />
+                        </div>
+                        <div class='col-md-4'>
+                            <TablerEnum
+                                v-model='involvementTypeSelection'
+                                label='Involvement Type'
+                                :options='involvementTypeOptions'
+                                :required='true'
+                            />
+                        </div>
+                        <div class='col-md-4'>
+                            <TablerEnum
+                                v-model='outcomeSelection'
+                                label='Outcome'
+                                :options='outcomeOptions'
+                                :disabled='!filteredOutcomes.length'
+                                :required='outcomeRequired'
+                            />
+                        </div>
+                    </div>
+
+                    <div class='row g-2 mb-2'>
+                        <div class='col-md-4'>
+                            <TablerEnum
+                                v-model='nationalitySelection'
+                                label='Nationality'
+                                :options='nationalityOptions'
+                            />
+                        </div>
+                        <div class='col-md-4'>
+                            <TablerEnum
+                                v-model='areaKnowledgeSelection'
+                                label='Area Knowledge'
+                                :options='areaKnowledgeOptions'
+                            />
+                        </div>
+                        <div class='col-md-4'>
+                            <TablerEnum
+                                v-model='causeSelection'
+                                label='Cause'
+                                :options='causeOptions'
+                            />
+                        </div>
+                    </div>
+
+                    <div class='row g-2 mb-2'>
+                        <div class='col-md-4'>
+                            <TablerEnum
+                                v-model='handoverSelection'
+                                label='Handover'
+                                :options='handoverOptions'
+                            />
+                        </div>
+                        <div class='col-md-4'>
+                            <TablerEnum
+                                v-model='spinalInjurySelection'
+                                label='Spinal Injury'
+                                :options='spinalInjuryOptions'
+                            />
+                        </div>
+                        <div class='col-md-4'>
+                            <TablerEnum
+                                v-model='transferSelection'
+                                label='Transfer'
+                                :options='transferOptions'
+                            />
+                        </div>
+                    </div>
+
+                    <div class='row g-2 mb-2'>
+                        <div class='col-md-6'>
+                            <TablerInput
+                                v-model='form.assistance'
+                                label='Assistance'
+                            />
+                        </div>
+                        <div class='col-md-6'>
+                            <TablerInput
+                                v-model='form.contact'
+                                label='Contact'
+                            />
+                        </div>
+                    </div>
+
+                    <TablerInput
+                        v-model='form.involvementNotes'
+                        :rows='4'
+                        label='Involvement Notes'
+                        placeholder='Pre-filled from mission subject details that have no direct D4H field'
+                    />
+
+                    <div
+                        v-if='cfLoading'
+                        class='text-muted small mt-2'
+                    >
+                        Loading custom fields…
+                    </div>
+
+                    <TablerBorder
+                        v-else-if='customFields.length'
+                        class='cloudtak-accent text-white mt-2'
+                        :fill-height='false'
+                        :shadow='false'
+                        gap='sm'
+                    >
+                        <template #label>
+                            <p class='text-uppercase text-white-50 small mb-0'>
+                                Custom Fields
+                            </p>
+                        </template>
+
+                        <template
+                            v-for='f in customFields'
+                            :key='f.id'
+                        >
+                            <TablerInput
+                                v-if='f.type === "TEXT_AREA"'
+                                :model-value='cfValues[f.id]'
+                                :rows='3'
+                                :label='f.title'
+                                :description='f.hint'
+                                :required='f.mandatory'
+                                @update:model-value='(v: string | number) => { cfValues[f.id] = v; }'
+                            />
+                            <TablerEnum
+                                v-else-if='f.type === "SINGLE_CHOICE"'
+                                :model-value='customChoiceLabel(f)'
+                                :label='f.title'
+                                :description='f.hint'
+                                :required='f.mandatory'
+                                :options='customChoiceOptions(f)'
+                                @update:model-value='(v: string) => setCustomChoice(f, v)'
+                            />
+                            <div
+                                v-else-if='f.type === "MULTIPLE_CHOICE"'
+                                class='mb-2'
+                            >
+                                <label class='small text-white-50 mb-1 d-block'>
+                                    {{ f.title }}
+                                    <span
+                                        v-if='f.mandatory'
+                                        class='text-danger'
+                                    >*</span>
+                                </label>
+                                <select
+                                    v-model='cfValues[f.id]'
+                                    class='form-select form-select-sm'
+                                    multiple
+                                    size='4'
+                                >
+                                    <option
+                                        v-for='o in f.options'
+                                        :key='o.id'
+                                        :value='o.id'
+                                    >
+                                        {{ o.label }}
+                                    </option>
+                                </select>
+                                <div
+                                    v-if='f.hint'
+                                    class='form-text small'
+                                >
+                                    {{ f.hint }}
+                                </div>
+                            </div>
+                            <TablerInput
+                                v-else
+                                :model-value='cfValues[f.id]'
+                                :type='inputTypeFor(f.type)'
+                                :label='f.title'
+                                :description='f.hint'
+                                :required='f.mandatory'
+                                @update:model-value='(v: string | number) => { cfValues[f.id] = v; }'
+                            />
+                        </template>
+                    </TablerBorder>
+
+                    <TablerInlineAlert
+                        v-if='showValidationAlert'
+                        class='mt-2'
+                        severity='danger'
+                        title='Fix Before Submitting'
+                        :description='validationMessage'
+                    />
+
+                    <button
+                        type='submit'
+                        class='btn btn-primary w-100 mt-2'
+                        :disabled='submitting || !canSubmit'
+                    >
+                        <span
+                            v-if='submitting'
+                            class='spinner-border spinner-border-sm me-1'
+                        />
+                        {{ submitting ? 'Submitting…' : 'Submit Subject' }}
+                    </button>
+                </form>
 
                 <div
-                    v-if='missingMandatory.length || !outcomeValid || invalidMandatoryCustom.length'
-                    class='text-danger small mb-2'
+                    v-else-if='metadataLoading'
+                    class='text-muted small'
                 >
-                    <span v-if='outcomeRequired && form.outcomeId === ""'>
-                        Outcome is required for the selected involvement type.
-                    </span>
-                    <span v-else-if='!outcomeValid'>
-                        Select a valid outcome for the chosen involvement type.
-                    </span>
-                    <span v-if='invalidMandatoryCustom.length'>
-                        Custom field{{ invalidMandatoryCustom.length === 1 ? '' : 's' }} have invalid format:
-                        {{ invalidMandatoryCustom.join(', ') }}
-                    </span>
-                    <span v-if='missingMandatory.length'>
-                        Required custom field{{ missingMandatory.length === 1 ? '' : 's' }}:
-                        {{ missingMandatory.join(', ') }}
-                    </span>
+                    Loading D4H involved-person metadata…
                 </div>
+            </TablerBorder>
 
-                <button
-                    type='submit'
-                    class='btn btn-primary btn-sm'
-                    :disabled='submitting || !canSubmit'
-                >
-                    <span
-                        v-if='submitting'
-                        class='spinner-border spinner-border-sm me-1'
-                    />
-                    {{ submitting ? 'Submitting…' : 'Submit subject' }}
-                </button>
-            </form>
+            <template v-if='result'>
+                <TablerInlineAlert
+                    class='mt-3'
+                    :severity='result.ok ? "success" : "danger"'
+                    :title='result.ok ? "Subject Submitted" : "Submit Failed"'
+                    :description='resultDescription'
+                />
 
-            <div
-                v-else-if='metadataLoading'
-                class='text-muted small'
-            >
-                Loading D4H involved-person metadata…
-            </div>
-
-            <div
-                v-if='result'
-                class='alert mt-3 py-2 small'
-                :class='result.ok ? "alert-success" : "alert-danger"'
-            >
-                <div v-if='result.ok'>
-                    Subject submitted — person involved id
-                    <strong>{{ result.personInvolvedId }}</strong>
-                    on incident {{ selectedIncident?.id }}.
-                    <div
-                        v-if='result.note'
-                        class='mt-1 text-muted'
-                    >
-                        {{ result.note }}
-                    </div>
-                </div>
-                <div v-else>
-                    <strong>Submit failed.</strong> {{ result.message }}
-                    <div
-                        v-if='result.hint'
-                        class='mt-1 text-muted'
-                    >
-                        {{ result.hint }}
-                    </div>
+                <template v-if='!result.ok'>
                     <details
                         v-if='result.apiBody || result.payload'
                         class='mt-2'
                     >
-                        <summary class='text-muted'>
-                            Technical details
+                        <summary class='text-muted small'>
+                            Technical Details
                         </summary>
                         <div
                             v-if='result.payload'
                             class='mt-2'
                         >
-                            <div class='fw-semibold'>
-                                Request payload
+                            <div class='fw-semibold small'>
+                                Request Payload
                             </div>
                             <pre
                                 class='small mb-0'
@@ -577,8 +365,8 @@
                             v-if='result.apiBody'
                             class='mt-2'
                         >
-                            <div class='fw-semibold'>
-                                D4H response
+                            <div class='fw-semibold small'>
+                                D4H Response
                             </div>
                             <pre
                                 class='small mb-0'
@@ -586,14 +374,15 @@
                             >{{ result.apiBody }}</pre>
                         </div>
                     </details>
-                </div>
-            </div>
+                </template>
+            </template>
         </template>
     </div>
 </template>
 
 <script setup lang='ts'>
 import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { TablerBorder, TablerInput, TablerEnum, TablerInlineAlert } from '@tak-ps/vue-tabler';
 import { loadConfig, type D4HConfig } from '../lib/d4h-config.ts';
 import type { D4HIncident, D4HRoster } from '../lib/d4h-types.ts';
 import { loadSubjectsFromMission } from '../lib/mission-subjects.ts';
@@ -728,6 +517,166 @@ const canSubmit = computed(() =>
     && missingMandatory.value.length === 0
     && invalidMandatoryCustom.value.length === 0,
 );
+
+const incidentOptionsOrPlaceholder = computed(() => (
+    incidentOptions.value.length
+        ? incidentOptions.value.map((o) => o.label)
+        : ['No incidents — run Sync now']
+));
+
+const incidentSelection = computed<string>({
+    get: () => incidentOptions.value.find((o) => o.id === selectedIncidentId.value)?.label
+        ?? incidentOptionsOrPlaceholder.value[0],
+    set: (label) => {
+        selectedIncidentId.value = incidentOptions.value.find((o) => o.label === label)?.id;
+    },
+});
+
+interface MissionOption { guid: string; label: string }
+
+const missionOptionsList = computed<MissionOption[]>(() => (
+    missions.value.map((m) => ({
+        guid: m.guid,
+        label: `${m.name}${m.guid === linkedMissionGuid.value ? ' (linked)' : ''}`,
+    }))
+));
+
+const missionOptionsOrPlaceholder = computed(() => (
+    missionOptionsList.value.length
+        ? missionOptionsList.value.map((o) => o.label)
+        : ['No loaded missions']
+));
+
+const missionSelection = computed<string>({
+    get: () => missionOptionsList.value.find((o) => o.guid === selectedMissionGuid.value)?.label
+        ?? missionOptionsOrPlaceholder.value[0],
+    set: (label) => {
+        selectedMissionGuid.value = missionOptionsList.value.find((o) => o.label === label)?.guid;
+        void loadSubjects();
+    },
+});
+
+interface SubjectOption { id: string; label: string }
+
+const subjectOptionsList = computed<SubjectOption[]>(() => (
+    subjects.value.map((s) => ({
+        id: s.subjectCaseID,
+        label: `Subject ${displaySubjectNumber(s.subjectCaseID)}${s.subjectName ? ` — ${s.subjectName}` : ''}`,
+    }))
+));
+
+const subjectOptionsOrPlaceholder = computed(() => (
+    subjectOptionsList.value.length
+        ? subjectOptionsList.value.map((o) => o.label)
+        : ['No subjects in mission']
+));
+
+const subjectSelection = computed<string>({
+    get: () => subjectOptionsList.value.find((o) => o.id === selectedSubjectCaseId.value)?.label
+        ?? subjectOptionsOrPlaceholder.value[0],
+    set: (label) => {
+        selectedSubjectCaseId.value = subjectOptionsList.value.find((o) => o.label === label)?.id ?? '';
+        applySelectedSubject();
+    },
+});
+
+const involvementTypeOptions = computed(() => ['Select type…', ...involvementTypes.value.map((t) => t.title)]);
+
+const involvementTypeSelection = computed<string>({
+    get: () => involvementTypes.value.find((t) => t.id === form.involvementTypeId)?.title
+        ?? involvementTypeOptions.value[0],
+    set: (title) => {
+        form.involvementTypeId = involvementTypes.value.find((t) => t.title === title)?.id ?? '';
+        form.outcomeId = '';
+    },
+});
+
+const outcomeOptions = computed(() => ['—', ...filteredOutcomes.value.map((o) => o.title)]);
+
+const outcomeSelection = computed<string>({
+    get: () => filteredOutcomes.value.find((o) => o.id === form.outcomeId)?.title
+        ?? outcomeOptions.value[0],
+    set: (title) => {
+        form.outcomeId = filteredOutcomes.value.find((o) => o.title === title)?.id ?? '';
+    },
+});
+
+type EnumFormField = 'sex' | 'nationality' | 'areaKnowledge' | 'cause' | 'handover' | 'spinalInjury' | 'transfer';
+
+function makeEnumSelection(field: EnumFormField, options: ReadonlyArray<{ value: string; label: string }>) {
+    return computed<string>({
+        get: () => options.find((o) => o.value === form[field])?.label ?? '—',
+        set: (label: string) => {
+            form[field] = options.find((o) => o.label === label)?.value ?? '';
+        },
+    });
+}
+
+const sexOptions = ['—', ...SEX_OPTIONS.map((o) => o.label)];
+const nationalityOptions = ['—', ...NATIONALITY_OPTIONS.map((o) => o.label)];
+const areaKnowledgeOptions = ['—', ...AREA_KNOWLEDGE_OPTIONS.map((o) => o.label)];
+const causeOptions = ['—', ...CAUSE_OPTIONS.map((o) => o.label)];
+const handoverOptions = ['—', ...HANDOVER_OPTIONS.map((o) => o.label)];
+const spinalInjuryOptions = ['—', ...SPINAL_INJURY_OPTIONS.map((o) => o.label)];
+const transferOptions = ['—', ...TRANSFER_OPTIONS.map((o) => o.label)];
+
+const sexSelection = makeEnumSelection('sex', SEX_OPTIONS);
+const nationalitySelection = makeEnumSelection('nationality', NATIONALITY_OPTIONS);
+const areaKnowledgeSelection = makeEnumSelection('areaKnowledge', AREA_KNOWLEDGE_OPTIONS);
+const causeSelection = makeEnumSelection('cause', CAUSE_OPTIONS);
+const handoverSelection = makeEnumSelection('handover', HANDOVER_OPTIONS);
+const spinalInjurySelection = makeEnumSelection('spinalInjury', SPINAL_INJURY_OPTIONS);
+const transferSelection = makeEnumSelection('transfer', TRANSFER_OPTIONS);
+
+function customChoiceOptions(f: D4HCustomField): string[] {
+    return ['—', ...f.options.map((o) => o.label)];
+}
+
+function customChoiceLabel(f: D4HCustomField): string {
+    return f.options.find((o) => o.id === cfValues[f.id])?.label ?? '—';
+}
+
+function setCustomChoice(f: D4HCustomField, label: string): void {
+    cfValues[f.id] = f.options.find((o) => o.label === label)?.id;
+}
+
+const showValidationAlert = computed(() =>
+    missingMandatory.value.length > 0 || !outcomeValid.value || invalidMandatoryCustom.value.length > 0,
+);
+
+const validationMessage = computed(() => {
+    const lines: string[] = [];
+
+    if (outcomeRequired.value && form.outcomeId === '') {
+        lines.push('Outcome is required for the selected involvement type.');
+    } else if (!outcomeValid.value) {
+        lines.push('Select a valid outcome for the chosen involvement type.');
+    }
+    if (invalidMandatoryCustom.value.length) {
+        lines.push(
+            `Custom field${invalidMandatoryCustom.value.length === 1 ? '' : 's'} have invalid format: `
+            + invalidMandatoryCustom.value.join(', '),
+        );
+    }
+    if (missingMandatory.value.length) {
+        lines.push(
+            `Required custom field${missingMandatory.value.length === 1 ? '' : 's'}: `
+            + missingMandatory.value.join(', '),
+        );
+    }
+
+    return lines.join(' ');
+});
+
+const resultDescription = computed(() => {
+    const r = result.value;
+    if (!r) return '';
+    if (r.ok) {
+        const base = `Person involved id ${r.personInvolvedId} on incident ${selectedIncident.value?.id}.`;
+        return r.note ? `${base} ${r.note}` : base;
+    }
+    return r.hint ? `${r.message} ${r.hint}` : r.message;
+});
 
 function applyIncidentMissionLink(inc: D4HIncident | null): void {
     linkedMissionGuid.value = inc?.missionGuid;
@@ -899,5 +848,9 @@ watch(selectedIncident, (inc) => {
         selectedMissionGuid.value = inc.missionGuid;
         void loadSubjects();
     }
+});
+
+watch(() => form.dateOfBirth, () => {
+    onDobChange();
 });
 </script>

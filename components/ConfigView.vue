@@ -1,156 +1,116 @@
 <template>
-    <div class='d-flex flex-column p-3'>
+    <div class='d-flex flex-column'>
         <!-- Server sync (hybrid) -->
-        <div class='mb-4'>
-            <h5 class='mb-2'>
-                Server sync (shared)
-            </h5>
-            <p class='small text-muted mb-2'>
+        <TablerBorder
+            class='cloudtak-accent text-white mb-3'
+            :fill-height='false'
+            :shadow='false'
+            gap='sm'
+        >
+            <template #label>
+                <p class='text-uppercase text-white-50 small mb-0'>
+                    Server Sync (Shared)
+                </p>
+            </template>
+
+            <p class='small text-white-50 mb-0'>
                 When configured, CloudTAK pulls D4H on a schedule into Postgres. Every operator
                 gets a fast refresh instead of each browser crawling D4H.
             </p>
 
             <div
                 v-if='serverAvailable === null'
-                class='text-muted small mb-2'
+                class='text-white-50 small'
             >
                 Checking CloudTAK server route…
             </div>
 
-            <div
+            <TablerInlineAlert
                 v-else-if='serverAvailable === false'
-                class='alert alert-secondary small mb-0'
-            >
-                Server route not installed. Use local config below, or run
-                <code>scripts/install.sh</code> and rebuild the API image.
-            </div>
+                severity='warning'
+                title='Server route not installed'
+                description='Use local config below, or run scripts/install.sh and rebuild the API image.'
+            />
 
             <template v-else>
-                <div
+                <TablerInlineAlert
                     v-if='!isSystemAdmin'
-                    class='alert alert-info small'
-                >
-                    Server sync is
-                    <strong>{{ serverForm.tokenConfigured ? 'configured' : 'not configured' }}</strong>.
-                    <span v-if='serverForm.lastSyncAt'>
-                        Last server sync:
-                        {{ serverForm.lastSyncAt }}
-                        <span v-if='serverForm.lastSyncStatus'>({{ serverForm.lastSyncStatus }})</span>.
-                    </span>
-                    Only a system admin can edit server credentials.
-                </div>
+                    severity='info'
+                    title='Server sync status'
+                    :description='serverStatusDescription'
+                />
 
                 <form
                     v-else
+                    class='d-flex flex-column gap-2'
                     @submit.prevent='onSaveServer'
                 >
                     <div class='row g-2'>
                         <div class='col-12 col-md-4'>
-                            <label class='form-label small fw-semibold'>Region</label>
-                            <select
+                            <TablerEnum
                                 v-model='serverForm.region'
-                                class='form-select form-select-sm'
-                            >
-                                <option value='us'>
-                                    us
-                                </option>
-                                <option value='eu'>
-                                    eu
-                                </option>
-                                <option value='ap'>
-                                    ap
-                                </option>
-                                <option value='ca'>
-                                    ca
-                                </option>
-                            </select>
+                                label='Region'
+                                :options='["us", "eu", "ap", "ca"]'
+                            />
                         </div>
                         <div class='col-12 col-md-4'>
-                            <label class='form-label small fw-semibold'>Context</label>
-                            <select
+                            <TablerEnum
                                 v-model='serverForm.context'
-                                class='form-select form-select-sm'
-                            >
-                                <option value='team'>
-                                    team
-                                </option>
-                                <option value='organization'>
-                                    organization
-                                </option>
-                            </select>
+                                label='Context'
+                                :options='["team", "organization"]'
+                            />
                         </div>
                         <div class='col-12 col-md-4'>
-                            <label class='form-label small fw-semibold'>Context ID</label>
-                            <input
+                            <TablerInput
                                 v-model.number='serverForm.contextId'
                                 type='number'
-                                min='1'
-                                class='form-control form-control-sm'
+                                label='Context ID'
                                 placeholder='e.g. 123'
-                                required
-                            >
+                                min='1'
+                                :required='true'
+                            />
                         </div>
                     </div>
 
-                    <div class='mt-2'>
-                        <label class='form-label small fw-semibold'>
-                            Base URL <span class='text-muted fw-normal'>(optional override)</span>
-                        </label>
-                        <input
-                            v-model='serverForm.baseUrl'
-                            type='url'
-                            class='form-control form-control-sm font-monospace'
-                            :placeholder='serverRegionDefaultUrl'
-                        >
-                    </div>
+                    <TablerInput
+                        v-model='serverForm.baseUrl'
+                        type='url'
+                        label='Base URL'
+                        description='Optional override — leave blank to use the regional default.'
+                        :placeholder='serverRegionDefaultUrl'
+                    />
 
-                    <div class='mt-2'>
-                        <label class='form-label small fw-semibold'>D4H token (server-held)</label>
-                        <input
-                            v-model='serverForm.token'
-                            type='password'
-                            autocomplete='off'
-                            class='form-control form-control-sm font-monospace'
-                            :placeholder='serverForm.tokenConfigured ? "(unchanged — paste to replace)" : "Paste D4H Bearer token"'
-                        >
-                        <div class='form-text small'>
-                            Stored in CloudTAK Postgres — never written to browser cache.
-                            Leave blank to keep the existing token.
-                        </div>
-                    </div>
+                    <TablerInput
+                        v-model='serverForm.token'
+                        type='password'
+                        label='D4H Token (Server-Held)'
+                        :placeholder='serverForm.tokenConfigured ? "(unchanged — paste to replace)" : "Paste D4H Bearer token"'
+                        description='Stored in CloudTAK Postgres — never written to browser cache. Leave blank to keep the existing token.'
+                    />
 
-                    <div class='mt-2'>
-                        <label class='form-label small fw-semibold'>Default TAK groups</label>
-                        <input
-                            v-model='serverForm.defaultGroupsText'
-                            type='text'
-                            class='form-control form-control-sm'
-                            placeholder='e.g. __ANON__, Team Alpha'
-                        >
-                        <div class='form-text small'>
-                            Comma-separated TAK channel names applied to every synced row.
-                            Callers only see rows whose groups intersect theirs.
-                        </div>
-                    </div>
+                    <TablerInput
+                        v-model='serverForm.defaultGroupsText'
+                        label='Default TAK Groups'
+                        placeholder='e.g. __ANON__, Team Alpha'
+                        description='Comma-separated TAK channel names applied to every synced row. Callers only see rows whose groups intersect theirs.'
+                    />
 
-                    <div class='mt-2 col-12 col-md-4'>
-                        <label class='form-label small fw-semibold'>Sync interval (minutes)</label>
-                        <input
-                            v-model.number='serverForm.syncIntervalMinutes'
-                            type='number'
-                            min='15'
-                            max='1440'
-                            class='form-control form-control-sm'
-                        >
-                        <div class='form-text small'>
-                            Clamped 15–1440. In-process timer (single API replica); external cron can also
-                            <code>POST /api/d4h/sync</code>.
+                    <div class='row g-2'>
+                        <div class='col-12 col-md-4'>
+                            <TablerInput
+                                v-model.number='serverForm.syncIntervalMinutes'
+                                type='number'
+                                label='Sync Interval (Minutes)'
+                                min='15'
+                                max='1440'
+                                description='Clamped 15–1440. In-process timer (single API replica); external cron can also POST /api/d4h/sync.'
+                            />
                         </div>
                     </div>
 
                     <div
                         v-if='serverForm.lastSyncAt'
-                        class='small text-muted mt-2'
+                        class='small text-white-50'
                     >
                         Last server sync: {{ serverForm.lastSyncAt }}
                         <span v-if='serverForm.lastSyncStatus'>({{ serverForm.lastSyncStatus }})</span>
@@ -160,7 +120,7 @@
                         >{{ serverForm.lastSyncError }}</span>
                     </div>
 
-                    <div class='mt-3 d-flex gap-2 flex-wrap'>
+                    <div class='d-flex gap-2 flex-wrap'>
                         <button
                             type='submit'
                             class='btn btn-primary btn-sm'
@@ -180,89 +140,79 @@
                     </div>
                 </form>
             </template>
-        </div>
+        </TablerBorder>
 
-        <hr class='my-2'>
+        <!-- Local D4H connection -->
+        <TablerBorder
+            class='cloudtak-accent text-white'
+            :fill-height='false'
+            :shadow='false'
+            gap='sm'
+        >
+            <template #label>
+                <p class='text-uppercase text-white-50 small mb-0'>
+                    Local D4H Connection <span class='fw-normal'>(fallback / writes)</span>
+                </p>
+            </template>
 
-        <h5 class='mb-3'>
-            Local D4H connection
-            <span class='text-muted fw-normal small'>(fallback / writes)</span>
-        </h5>
-        <p class='small text-muted mb-2'>
-            Used for Submit Incident/Roster/Subject and for Sync when the server route is not configured.
-        </p>
+            <p class='small text-white-50 mb-0'>
+                Used for Submit Incident/Roster/Subject and for Sync when the server route is not configured.
+            </p>
 
-        <form @submit.prevent='onSave'>
-            <div class='row g-2'>
-                <div class='col-12 col-md-4'>
-                    <label class='form-label small fw-semibold'>Region</label>
-                    <select
-                        v-model='form.region'
-                        class='form-select form-select-sm'
-                    >
-                        <option value='us'>
-                            us
-                        </option>
-                        <option value='eu'>
-                            eu
-                        </option>
-                        <option value='ap'>
-                            ap
-                        </option>
-                        <option value='ca'>
-                            ca
-                        </option>
-                    </select>
+            <form
+                class='d-flex flex-column gap-2'
+                @submit.prevent='onSave'
+            >
+                <div class='row g-2'>
+                    <div class='col-12 col-md-4'>
+                        <TablerEnum
+                            v-model='form.region'
+                            label='Region'
+                            :options='["us", "eu", "ap", "ca"]'
+                        />
+                    </div>
+                    <div class='col-12 col-md-4'>
+                        <TablerEnum
+                            v-model='form.context'
+                            label='Context'
+                            :options='["team", "organization"]'
+                        />
+                    </div>
+                    <div class='col-12 col-md-4'>
+                        <TablerInput
+                            v-model.number='form.contextId'
+                            type='number'
+                            label='Context ID'
+                            placeholder='e.g. 123'
+                            min='1'
+                            :required='true'
+                        />
+                    </div>
                 </div>
-                <div class='col-12 col-md-4'>
-                    <label class='form-label small fw-semibold'>Context</label>
-                    <select
-                        v-model='form.context'
-                        class='form-select form-select-sm'
-                    >
-                        <option value='team'>
-                            team
-                        </option>
-                        <option value='organization'>
-                            organization
-                        </option>
-                    </select>
-                </div>
-                <div class='col-12 col-md-4'>
-                    <label class='form-label small fw-semibold'>Context ID</label>
-                    <input
-                        v-model.number='form.contextId'
-                        type='number'
-                        min='1'
-                        class='form-control form-control-sm'
-                        placeholder='e.g. 123'
-                        required
-                    >
-                </div>
-            </div>
 
-            <div class='mt-2'>
-                <label class='form-label small fw-semibold'>
-                    Base URL <span class='text-muted fw-normal'>(override — leave blank to use regional default)</span>
-                </label>
-                <input
+                <TablerInput
                     v-model='form.baseUrl'
                     type='url'
-                    class='form-control form-control-sm font-monospace'
+                    label='Base URL'
+                    description='Override — leave blank to use the regional default.'
                     :placeholder='regionDefaultUrl'
-                >
-            </div>
+                />
 
-            <div class='mt-2'>
-                <div class='d-flex align-items-center gap-1 mb-1'>
-                    <label class='form-label small fw-semibold mb-0'>D4H Personal Access Token</label>
+                <TablerInput
+                    v-model='form.token'
+                    type='password'
+                    label='D4H Personal Access Token'
+                    placeholder='Paste D4H Bearer token'
+                    description='Stored locally via Capacitor Preferences. On deployed CloudTAK (non-localhost), D4H calls go through the Plugin Proxy — enable it in Admin and whitelist your D4H API origin (e.g. https://api.team-manager.us.d4h.com).'
+                    :required='true'
+                >
                     <div
                         ref='tokenHelpRef'
                         class='position-relative d-inline-flex'
                     >
                         <button
                             type='button'
-                            class='btn btn-link btn-sm p-0 text-muted lh-1 border-0'
+                            class='btn btn-link btn-sm p-0 text-white-50 lh-1 border-0'
                             aria-label='How to obtain a D4H Personal Access Token'
                             @click.stop='tokenHelpOpen = !tokenHelpOpen'
                         >
@@ -273,7 +223,7 @@
                         </button>
                         <div
                             v-if='tokenHelpOpen'
-                            class='position-absolute start-0 mt-1 p-2 bg-body border rounded shadow-sm small'
+                            class='position-absolute end-0 mt-1 p-2 bg-body border rounded shadow-sm small'
                             style='z-index:1050; min-width:16rem; top:100%;'
                             @click.stop
                         >
@@ -286,69 +236,52 @@
                             </a>
                         </div>
                     </div>
-                </div>
-                <input
-                    v-model='form.token'
-                    type='password'
-                    autocomplete='off'
-                    class='form-control form-control-sm font-monospace'
-                    placeholder='Paste D4H Bearer token'
-                    required
-                >
-                <div class='form-text small'>
-                    Stored locally via Capacitor Preferences. On deployed CloudTAK (non-localhost), D4H
-                    calls go through the Plugin Proxy — enable it in Admin and whitelist your D4H API
-                    origin (e.g. <code>https://api.team-manager.us.d4h.com</code>).
-                </div>
-            </div>
+                </TablerInput>
 
-            <div class='mt-3 d-flex gap-2 flex-wrap align-items-center'>
-                <button
-                    type='submit'
-                    class='btn btn-primary btn-sm'
-                    :disabled='!canSubmit || saving'
-                >
-                    {{ saving ? 'Saving…' : 'Save local' }}
-                </button>
-                <button
-                    type='button'
-                    class='btn btn-outline-secondary btn-sm'
-                    :disabled='!canSubmit || testing'
-                    @click='onTest'
-                >
-                    {{ testing ? 'Testing…' : 'Test connection' }}
-                </button>
-                <button
-                    v-if='hasSaved'
-                    type='button'
-                    class='btn btn-outline-danger btn-sm ms-auto'
-                    @click='onClear'
-                >
-                    Clear saved config
-                </button>
-            </div>
-        </form>
+                <div class='d-flex gap-2 flex-wrap align-items-center'>
+                    <button
+                        type='submit'
+                        class='btn btn-primary btn-sm'
+                        :disabled='!canSubmit || saving'
+                    >
+                        {{ saving ? 'Saving…' : 'Save local' }}
+                    </button>
+                    <button
+                        type='button'
+                        class='btn btn-outline-secondary btn-sm'
+                        :disabled='!canSubmit || testing'
+                        @click='onTest'
+                    >
+                        {{ testing ? 'Testing…' : 'Test connection' }}
+                    </button>
+                    <button
+                        v-if='hasSaved'
+                        type='button'
+                        class='btn btn-outline-danger btn-sm ms-auto'
+                        @click='onClear'
+                    >
+                        Clear saved config
+                    </button>
+                </div>
+            </form>
+        </TablerBorder>
 
         <div
             v-if='status'
-            class='alert alert-dismissible fade show alert-sm mt-3 small'
-            :class='statusClass'
+            class='mt-3'
         >
+            <TablerInlineAlert
+                :severity='status.kind === "ok" ? "success" : status.kind === "err" ? "danger" : "info"'
+                :title='status.title'
+                :description='status.detail'
+            />
             <button
                 type='button'
-                class='btn-close'
-                aria-label='Close'
+                class='btn btn-sm btn-link px-0'
                 @click='status = null'
-            />
-            <div class='fw-semibold'>
-                {{ status.title }}
-            </div>
-            <div
-                v-if='status.detail'
-                style='white-space:pre-wrap'
             >
-                {{ status.detail }}
-            </div>
+                Dismiss
+            </button>
         </div>
     </div>
 </template>
@@ -356,6 +289,9 @@
 <script setup lang='ts'>
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue';
 import { IconInfoCircle } from '@tabler/icons-vue';
+import {
+    TablerBorder, TablerEnum, TablerInlineAlert, TablerInput,
+} from '@tak-ps/vue-tabler';
 import {
     loadConfig, saveConfig, clearConfig, regionBaseUrl,
     type D4HConfig, type D4HRegion, type D4HContext,
@@ -427,11 +363,14 @@ const canSubmitServer = computed(() =>
     && serverForm.contextId > 0
     && (serverForm.tokenConfigured || !!serverForm.token.trim())
 );
-const statusClass = computed(() => ({
-    'alert-success': status.value?.kind === 'ok',
-    'alert-danger':  status.value?.kind === 'err',
-    'alert-info':    status.value?.kind === 'info',
-}));
+const serverStatusDescription = computed(() => {
+    const parts = [`Server sync is ${serverForm.tokenConfigured ? 'configured' : 'not configured'}.`];
+    if (serverForm.lastSyncAt) {
+        parts.push(`Last server sync: ${serverForm.lastSyncAt}${serverForm.lastSyncStatus ? ` (${serverForm.lastSyncStatus})` : ''}.`);
+    }
+    parts.push('Only a system admin can edit server credentials.');
+    return parts.join(' ');
+});
 
 async function loadServerSection(): Promise<void> {
     try {

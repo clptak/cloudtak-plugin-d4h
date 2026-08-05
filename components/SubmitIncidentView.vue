@@ -1,417 +1,387 @@
 <template>
-    <div class='d-flex flex-column p-3'>
-        <h5 class='mb-3'>
-            Submit incident to D4H
-        </h5>
-
-        <div
+    <div class='d-flex flex-column'>
+        <TablerInlineAlert
             v-if='!config'
-            class='alert alert-warning py-2 small'
-        >
-            D4H connection is not configured yet. Open the connection settings (gear icon) and run
-            <strong>Test connection</strong> first.
-        </div>
+            severity='warning'
+            title='D4H Not Configured'
+            description='D4H connection is not configured yet. Open the connection settings (gear icon) and run Test Connection first.'
+        />
 
-        <form
+        <TablerBorder
             v-else
-            @submit.prevent='onSubmit'
+            class='cloudtak-accent text-white'
+            :fill-height='false'
+            :shadow='false'
+            gap='sm'
         >
-            <!-- Mission source: active by default, override via dropdown -->
-            <div class='mb-3'>
-                <label class='form-label small fw-semibold'>
-                    DataSync mission
-                    <span class='text-muted fw-normal'>(defaults to active mission)</span>
-                </label>
-                <select
-                    v-model='selectedMissionGuid'
-                    class='form-select form-select-sm'
-                    @change='onMissionChange'
-                >
-                    <option
-                        v-if='!missions.length'
-                        :value='undefined'
-                    >
-                        No loaded missions
-                    </option>
-                    <option
-                        v-for='m in missions'
-                        :key='m.guid'
-                        :value='m.guid'
-                    >
-                        {{ m.name }}{{ m.guid === activeMissionGuid ? ' (active)' : '' }}
-                    </option>
-                </select>
-            </div>
+            <template #label>
+                <p class='text-uppercase text-white-50 small mb-0'>
+                    Submit Incident
+                </p>
+            </template>
 
-            <!-- CoT point picker → fills location lat/lon -->
-            <div class='mb-3'>
-                <label class='form-label small fw-semibold'>
-                    Location — CoT point
-                    <span class='text-muted fw-normal'>({{ points.length }} point{{ points.length === 1 ? '' : 's' }} in mission)</span>
-                </label>
-                <select
-                    v-model='selectedPointId'
-                    class='form-select form-select-sm'
-                    :disabled='!points.length'
-                >
-                    <option :value='undefined'>
-                        {{ points.length ? 'Select a point…' : 'No points in this mission' }}
-                    </option>
-                    <option
-                        v-for='p in points'
-                        :key='p.id'
-                        :value='p.id'
-                    >
-                        {{ p.label }} — {{ p.lat.toFixed(5) }}, {{ p.lon.toFixed(5) }}
-                    </option>
-                </select>
-                <div
-                    v-if='selectedPoint'
-                    class='form-text small'
-                >
-                    latitude {{ selectedPoint.lat }}, longitude {{ selectedPoint.lon }}
-                </div>
-            </div>
-
-            <!-- Overlay attribute detection -->
-            <div
-                v-if='selectedPoint'
-                class='mb-3'
-            >
-                <div class='d-flex gap-2 flex-wrap'>
-                    <button
-                        type='button'
-                        class='btn btn-outline-secondary btn-sm'
-                        @click='onInspect'
-                    >
-                        Inspect overlays at point
-                    </button>
-                    <button
-                        v-if='hasOverlayMapping'
-                        type='button'
-                        class='btn btn-outline-primary btn-sm'
-                        :disabled='detecting'
-                        @click='onDetect'
-                    >
-                        {{ detecting ? 'Detecting…' : 'Detect mapped fields' }}
-                    </button>
-                </div>
-                <div class='form-text small'>
-                    Reads attributes from overlays that are toggled on. The map recenters on the point first.
-                    <span v-if='hasOverlayMapping'>Mapped fields auto-detect when you pick a point; use the button to re-run.</span>
-                    <span v-else>Add rows to <code>lib/overlay-field-map.ts</code> to enable auto-fill.</span>
-                </div>
-
-                <!-- Inspect output: layer ids + property keys for authoring the mapping -->
-                <div
-                    v-if='inspectResults'
-                    class='border rounded p-2 mt-1 small'
-                >
-                    <div v-if='!inspectResults.length'>
-                        <div class='text-muted mb-1'>
-                            No overlay features matched at this point. Diagnostics below:
+            <form @submit.prevent='onSubmit'>
+                <div class='row g-2'>
+                    <!-- Mission source: active by default, override via dropdown -->
+                    <div class='col-12'>
+                        <TablerEnum
+                            v-model='missionModel'
+                            label='DataSync Mission'
+                            :options='missionOptions'
+                        />
+                        <div class='form-text small text-white-50'>
+                            Defaults to the active mission.
                         </div>
-                        <div
-                            v-if='inspectDebug'
-                            class='font-monospace'
-                            style='font-size:0.75rem'
-                        >
-                            <div>Rendered features here: {{ inspectDebug.totalFeaturesAtPoint }}</div>
-                            <div class='mt-1'>
-                                Overlays toggled on:
-                                <span v-if='!inspectDebug.visibleOverlays.length'>none</span>
-                            </div>
-                            <div
-                                v-for='o in inspectDebug.visibleOverlays'
-                                :key='o.id'
+                    </div>
+
+                    <!-- CoT point picker → fills location lat/lon -->
+                    <div class='col-12'>
+                        <TablerEnum
+                            v-model='pointModel'
+                            label='Location — CoT Point'
+                            :options='pointOptions'
+                            :disabled='!points.length'
+                        />
+                        <div class='form-text small text-white-50'>
+                            {{ points.length }} point{{ points.length === 1 ? '' : 's' }} in mission
+                            <span v-if='selectedPoint'>
+                                · latitude {{ selectedPoint.lat }}, longitude {{ selectedPoint.lon }}
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Overlay attribute detection -->
+                    <div
+                        v-if='selectedPoint'
+                        class='col-12'
+                    >
+                        <div class='d-flex gap-2 flex-wrap'>
+                            <button
+                                type='button'
+                                class='btn btn-outline-secondary btn-sm'
+                                @click='onInspect'
                             >
-                                • {{ o.name }} (id {{ o.id }}, type {{ o.type || '?' }})
-                            </div>
-                            <div class='mt-1'>
-                                Layers rendered at point (layerId ← source):
-                                <span v-if='!inspectDebug.sampleLayers.length'>none</span>
+                                Inspect Overlays At Point
+                            </button>
+                            <button
+                                v-if='hasOverlayMapping'
+                                type='button'
+                                class='btn btn-outline-primary btn-sm'
+                                :disabled='detecting'
+                                @click='onDetect'
+                            >
+                                {{ detecting ? 'Detecting…' : 'Detect Mapped Fields' }}
+                            </button>
+                        </div>
+                        <div class='form-text small text-white-50'>
+                            Reads attributes from overlays that are toggled on. The map recenters on the point first.
+                            <span v-if='hasOverlayMapping'>Mapped fields auto-detect when you pick a point; use the button to re-run.</span>
+                            <span v-else>Add rows to <code>lib/overlay-field-map.ts</code> to enable auto-fill.</span>
+                        </div>
+
+                        <!-- Inspect output: layer ids + property keys for authoring the mapping -->
+                        <div
+                            v-if='inspectResults'
+                            class='cloudtak-accent border rounded-3 text-white px-2 py-2 mt-1 small'
+                        >
+                            <div v-if='!inspectResults.length'>
+                                <div class='text-white-50 mb-1'>
+                                    No overlay features matched at this point. Diagnostics below:
+                                </div>
+                                <div
+                                    v-if='inspectDebug'
+                                    class='font-monospace'
+                                    style='font-size:0.75rem'
+                                >
+                                    <div>Rendered features here: {{ inspectDebug.totalFeaturesAtPoint }}</div>
+                                    <div class='mt-1'>
+                                        Overlays toggled on:
+                                        <span v-if='!inspectDebug.visibleOverlays.length'>none</span>
+                                    </div>
+                                    <div
+                                        v-for='o in inspectDebug.visibleOverlays'
+                                        :key='o.id'
+                                    >
+                                        • {{ o.name }} (id {{ o.id }}, type {{ o.type || '?' }})
+                                    </div>
+                                    <div class='mt-1'>
+                                        Layers rendered at point (layerId ← source):
+                                        <span v-if='!inspectDebug.sampleLayers.length'>none</span>
+                                    </div>
+                                    <div
+                                        v-for='(l, i) in inspectDebug.sampleLayers'
+                                        :key='i'
+                                    >
+                                        • {{ l.layerId }} ← {{ l.source || '(none)' }}
+                                    </div>
+                                </div>
                             </div>
                             <div
-                                v-for='(l, i) in inspectDebug.sampleLayers'
+                                v-for='(r, i) in inspectResults'
                                 :key='i'
+                                class='mb-2'
                             >
-                                • {{ l.layerId }} ← {{ l.source || '(none)' }}
+                                <div class='fw-semibold'>
+                                    <span class='text-white-50 me-1'>overlayLayerId:</span>
+                                    <code
+                                        class='text-success'
+                                        title='Use THIS in overlay-field-map.ts (stable across restarts)'
+                                    >{{ r.stableLayerId }}</code>
+                                    <code
+                                        class='text-white-50 ms-1'
+                                        style='font-size:0.7rem'
+                                        title='full runtime id — leading number changes on restart'
+                                    >({{ r.layerId }})</code>
+                                </div>
+                                <div
+                                    v-for='(val, key) in r.properties'
+                                    :key='key'
+                                    class='font-monospace'
+                                >
+                                    {{ key }}: {{ val }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Detect output -->
+                        <div
+                            v-if='detectStatus'
+                            class='mt-1 small'
+                        >
+                            <div
+                                v-for='(a, i) in detectStatus.applied'
+                                :key='"a" + i'
+                                class='text-success'
+                            >
+                                ✓ {{ a }}
+                            </div>
+                            <div
+                                v-for='(u, i) in detectStatus.unmatched'
+                                :key='"u" + i'
+                                class='text-white-50'
+                            >
+                                • {{ u }}
                             </div>
                         </div>
                     </div>
+
+                    <!-- Title → referenceDescription -->
+                    <div class='col-12'>
+                        <TablerInput
+                            v-model='form.title'
+                            label='Incident Title'
+                            placeholder='e.g. Missing hiker — Bear Creek'
+                            :required='true'
+                        />
+                        <div class='form-text small text-white-50'>
+                            {{ form.title.length }}/100 — maps to D4H referenceDescription
+                        </div>
+                    </div>
+
+                    <!-- Description → description (HTML-capable) -->
+                    <div class='col-12'>
+                        <TablerInput
+                            v-model='form.description'
+                            label='Description'
+                            :rows='4'
+                            placeholder='Free-text incident description'
+                        />
+                    </div>
+
+                    <!-- Start / end times -->
+                    <div class='col-12 col-md-6'>
+                        <TablerInput
+                            v-model='form.startsAtLocal'
+                            label='Starts At'
+                            type='datetime-local'
+                            :required='true'
+                        />
+                        <div class='form-text small text-white-50'>
+                            Pre-filled from mission creation time. Sent as UTC: {{ startsAtUTC || '—' }}
+                        </div>
+                    </div>
+                    <div class='col-12 col-md-6'>
+                        <TablerInput
+                            v-model='form.endsAtLocal'
+                            label='Ends At'
+                            type='datetime-local'
+                        />
+                        <div class='form-text small text-white-50'>
+                            Optional.
+                        </div>
+                    </div>
+
+                    <!-- Full team toggle; member-group multi-select when off -->
+                    <div class='col-12'>
+                        <TablerToggle
+                            :model-value='form.fullTeam'
+                            label='Full Team'
+                            @update:model-value='onFullTeamToggle'
+                        />
+                    </div>
+
                     <div
-                        v-for='(r, i) in inspectResults'
-                        :key='i'
-                        class='mb-2'
+                        v-if='!form.fullTeam'
+                        class='col-12'
                     >
-                        <div class='fw-semibold'>
-                            <span class='text-muted me-1'>overlayLayerId:</span>
-                            <code
-                                class='text-success'
-                                title='Use THIS in overlay-field-map.ts (stable across restarts)'
-                            >{{ r.stableLayerId }}</code>
-                            <code
-                                class='text-muted ms-1'
-                                style='font-size:0.7rem'
-                                title='full runtime id — leading number changes on restart'
-                            >({{ r.layerId }})</code>
+                        <div class='row'>
+                            <div class='col-12 d-flex my-1'>
+                                <div class='align-self-center'>
+                                    <div class='px-2'>
+                                        <span class='user-select-none'>Member Groups</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class='col-12'>
+                                <select
+                                    v-model='form.selectedGroupIds'
+                                    class='form-select form-select-sm'
+                                    multiple
+                                    size='5'
+                                    :disabled='groupsLoading'
+                                >
+                                    <option
+                                        v-for='g in memberGroups'
+                                        :key='g.id'
+                                        :value='g.id'
+                                    >
+                                        {{ g.title }}
+                                    </option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class='form-text small text-white-50'>
+                            {{ groupsLoading ? 'Loading groups…' : 'Selection is captured but not yet submitted (v1).' }}
+                        </div>
+                    </div>
+
+                    <!-- Dynamic incident custom fields -->
+                    <div
+                        v-if='cfLoading'
+                        class='col-12 text-white-50 small'
+                    >
+                        Loading incident fields…
+                    </div>
+                    <template v-else-if='customFields.length'>
+                        <div class='col-12'>
+                            <p class='text-uppercase text-white-50 small mb-0 mt-1'>
+                                Incident Details
+                            </p>
                         </div>
                         <div
-                            v-for='(val, key) in r.properties'
-                            :key='key'
-                            class='font-monospace'
+                            v-for='f in customFields'
+                            :key='f.id'
+                            class='col-12'
                         >
-                            {{ key }}: {{ val }}
+                            <TablerInput
+                                v-if='f.type === "TEXT_AREA"'
+                                v-model='cfValues[f.id]'
+                                :label='f.title'
+                                :rows='3'
+                                :required='f.mandatory'
+                            />
+                            <TablerEnum
+                                v-else-if='f.type === "SINGLE_CHOICE"'
+                                :model-value='cfSingleChoiceLabel(f)'
+                                :label='f.title'
+                                :required='f.mandatory'
+                                :options='cfSingleChoiceOptions(f)'
+                                @update:model-value='(v: string) => onCfSingleChoiceChange(f, v)'
+                            />
+                            <div
+                                v-else-if='f.type === "MULTIPLE_CHOICE"'
+                                class='row'
+                            >
+                                <div class='col-12 d-flex my-1'>
+                                    <div class='align-self-center'>
+                                        <div class='px-2'>
+                                            <span class='user-select-none'>{{ f.title }}</span>
+                                            <span
+                                                v-if='f.mandatory'
+                                                class='text-red mx-1'
+                                            >*</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class='col-12'>
+                                    <select
+                                        v-model='cfValues[f.id]'
+                                        class='form-select form-select-sm'
+                                        multiple
+                                        size='4'
+                                    >
+                                        <option
+                                            v-for='o in f.options'
+                                            :key='o.id'
+                                            :value='o.id'
+                                        >
+                                            {{ o.label }}
+                                        </option>
+                                    </select>
+                                </div>
+                            </div>
+                            <TablerInput
+                                v-else
+                                v-model='cfValues[f.id]'
+                                :label='f.title'
+                                :type='inputTypeFor(f.type)'
+                                :required='f.mandatory'
+                            />
+
+                            <div class='form-text small text-white-50'>
+                                <span v-if='f.hint'>{{ f.hint }}</span>
+                                <code
+                                    class='text-white-50 ms-1'
+                                    title='custom field id — use in overlay-field-map.ts'
+                                >#{{ f.id }}</code>
+                            </div>
                         </div>
-                    </div>
-                </div>
-
-                <!-- Detect output -->
-                <div
-                    v-if='detectStatus'
-                    class='mt-1 small'
-                >
-                    <div
-                        v-for='(a, i) in detectStatus.applied'
-                        :key='"a" + i'
-                        class='text-success'
-                    >
-                        ✓ {{ a }}
-                    </div>
-                    <div
-                        v-for='(u, i) in detectStatus.unmatched'
-                        :key='"u" + i'
-                        class='text-muted'
-                    >
-                        • {{ u }}
-                    </div>
-                </div>
-            </div>
-
-            <!-- Title → referenceDescription -->
-            <div class='mb-3'>
-                <label class='form-label small fw-semibold'>
-                    Incident title <span class='text-danger'>*</span>
-                </label>
-                <input
-                    v-model='form.title'
-                    type='text'
-                    maxlength='100'
-                    class='form-control form-control-sm'
-                    placeholder='e.g. Missing hiker — Bear Creek'
-                    required
-                >
-                <div class='form-text small'>
-                    {{ form.title.length }}/100 — maps to D4H referenceDescription
-                </div>
-            </div>
-
-            <!-- Description → description (HTML-capable) -->
-            <div class='mb-3'>
-                <label class='form-label small fw-semibold'>Description</label>
-                <textarea
-                    v-model='form.description'
-                    rows='4'
-                    class='form-control form-control-sm'
-                    placeholder='Free-text incident description'
-                />
-            </div>
-
-            <!-- Start / end times -->
-            <div class='row g-2 mb-3'>
-                <div class='col-12 col-md-6'>
-                    <label class='form-label small fw-semibold'>
-                        Starts at <span class='text-danger'>*</span>
-                    </label>
-                    <input
-                        v-model='form.startsAtLocal'
-                        type='datetime-local'
-                        class='form-control form-control-sm'
-                        required
-                    >
-                    <div class='form-text small'>
-                        Pre-filled from mission creation time. Sent as UTC: {{ startsAtUTC || '—' }}
-                    </div>
-                </div>
-                <div class='col-12 col-md-6'>
-                    <label class='form-label small fw-semibold'>
-                        Ends at <span class='text-muted fw-normal'>(optional)</span>
-                    </label>
-                    <input
-                        v-model='form.endsAtLocal'
-                        type='datetime-local'
-                        class='form-control form-control-sm'
-                    >
-                </div>
-            </div>
-
-            <!-- Full team toggle; member-group multi-select when off -->
-            <div class='mb-3'>
-                <div class='form-check form-switch'>
-                    <input
-                        id='d4h-full-team'
-                        v-model='form.fullTeam'
-                        class='form-check-input'
-                        type='checkbox'
-                        @change='onFullTeamChange'
-                    >
-                    <label
-                        class='form-check-label small fw-semibold'
-                        for='d4h-full-team'
-                    >
-                        Full team
-                    </label>
-                </div>
-
-                <div
-                    v-if='!form.fullTeam'
-                    class='mt-2'
-                >
-                    <label class='form-label small fw-semibold'>Member groups</label>
-                    <select
-                        v-model='form.selectedGroupIds'
-                        class='form-select form-select-sm'
-                        multiple
-                        size='5'
-                        :disabled='groupsLoading'
-                    >
-                        <option
-                            v-for='g in memberGroups'
-                            :key='g.id'
-                            :value='g.id'
-                        >
-                            {{ g.title }}
-                        </option>
-                    </select>
-                    <div class='form-text small'>
-                        {{ groupsLoading ? 'Loading groups…' : 'Selection is captured but not yet submitted (v1).' }}
-                    </div>
-                </div>
-            </div>
-
-            <!-- Dynamic incident custom fields -->
-            <div
-                v-if='cfLoading'
-                class='text-muted small mb-3'
-            >
-                Loading incident fields…
-            </div>
-            <div
-                v-else-if='customFields.length'
-                class='mb-3'
-            >
-                <label class='form-label small fw-semibold d-block'>Incident details</label>
-                <div
-                    v-for='f in customFields'
-                    :key='f.id'
-                    class='mb-2'
-                >
-                    <label class='form-label small mb-1'>
-                        {{ f.title }}
-                        <span
-                            v-if='f.mandatory'
-                            class='text-danger'
-                        >*</span>
-                        <code
-                            class='text-muted ms-1'
-                            title='custom field id — use in overlay-field-map.ts'
-                        >#{{ f.id }}</code>
-                    </label>
-
-                    <textarea
-                        v-if='f.type === "TEXT_AREA"'
-                        v-model='cfValues[f.id]'
-                        rows='3'
-                        class='form-control form-control-sm'
-                    />
-                    <select
-                        v-else-if='f.type === "SINGLE_CHOICE"'
-                        v-model='cfValues[f.id]'
-                        class='form-select form-select-sm'
-                    >
-                        <option :value='undefined'>
-                            —
-                        </option>
-                        <option
-                            v-for='o in f.options'
-                            :key='o.id'
-                            :value='o.id'
-                        >
-                            {{ o.label }}
-                        </option>
-                    </select>
-                    <select
-                        v-else-if='f.type === "MULTIPLE_CHOICE"'
-                        v-model='cfValues[f.id]'
-                        class='form-select form-select-sm'
-                        multiple
-                        size='4'
-                    >
-                        <option
-                            v-for='o in f.options'
-                            :key='o.id'
-                            :value='o.id'
-                        >
-                            {{ o.label }}
-                        </option>
-                    </select>
-                    <input
-                        v-else
-                        v-model='cfValues[f.id]'
-                        :type='inputTypeFor(f.type)'
-                        class='form-control form-control-sm'
-                    >
+                    </template>
 
                     <div
-                        v-if='f.hint'
-                        class='form-text small'
+                        v-if='missingMandatory.length'
+                        class='col-12'
                     >
-                        {{ f.hint }}
+                        <TablerInlineAlert
+                            severity='danger'
+                            :title='missingMandatoryTitle'
+                            :description='missingMandatory.join(", ")'
+                        />
+                    </div>
+
+                    <div class='col-12'>
+                        <button
+                            type='submit'
+                            class='btn btn-primary w-100'
+                            :disabled='submitting || !canSubmit'
+                        >
+                            {{ submitting ? 'Submitting…' : 'Submit Incident' }}
+                        </button>
                     </div>
                 </div>
-            </div>
-
-            <div
-                v-if='missingMandatory.length'
-                class='text-danger small mb-2'
-            >
-                Required field{{ missingMandatory.length === 1 ? '' : 's' }}: {{ missingMandatory.join(', ') }}
-            </div>
-
-            <button
-                type='submit'
-                class='btn btn-primary btn-sm'
-                :disabled='submitting || !canSubmit'
-            >
-                {{ submitting ? 'Submitting…' : 'Submit incident' }}
-            </button>
-        </form>
+            </form>
+        </TablerBorder>
 
         <!-- Result / errors -->
-        <div
-            v-if='result'
-            class='alert mt-3 py-2 small'
-            :class='result.ok ? "alert-success" : "alert-danger"'
-        >
-            <div v-if='result.ok'>
-                Incident created — D4H id <strong>{{ result.id }}</strong>{{ result.reference ? ` (ref ${result.reference})` : '' }}.
-                Added to the Incidents list for this mission.
-            </div>
-            <div v-else>
-                <strong>Submit failed.</strong> {{ result.message }}
-                <div
-                    v-if='result.hint'
-                    class='mt-1 text-muted'
-                >
-                    {{ result.hint }}
-                </div>
-            </div>
-        </div>
+        <TablerInlineAlert
+            v-if='resultAlert'
+            class='mt-3'
+            :severity='resultAlert.severity'
+            :title='resultAlert.title'
+            :description='resultAlert.description'
+        />
     </div>
 </template>
 
 <script setup lang='ts'>
 import { computed, onMounted, reactive, ref, watch } from 'vue';
+import {
+    TablerBorder,
+    TablerEnum,
+    TablerInlineAlert,
+    TablerInput,
+    TablerToggle,
+} from '@tak-ps/vue-tabler';
 import { loadConfig, type D4HConfig } from '../lib/d4h-config.ts';
 import {
     peekIncidentReference,
@@ -491,6 +461,53 @@ const form = reactive({
 
 const selectedPoint = computed(() => points.value.find(p => p.id === selectedPointId.value) ?? null);
 
+// ── TablerEnum label ↔ id/guid mapping (TablerEnum only supports string options) ───────────────
+function missionLabel(m: MissionRef): string {
+    return `${m.name}${m.guid === activeMissionGuid.value ? ' (active)' : ''}`;
+}
+
+const missionOptions = computed(() =>
+    missions.value.length ? missions.value.map(missionLabel) : ['No loaded missions'],
+);
+
+const missionModel = computed<string>({
+    get: () => {
+        const m = missions.value.find(x => x.guid === selectedMissionGuid.value);
+        return m ? missionLabel(m) : 'No loaded missions';
+    },
+    set: (label) => {
+        const m = missions.value.find(x => missionLabel(x) === label);
+        if (!m || m.guid === selectedMissionGuid.value) return;
+        selectedMissionGuid.value = m.guid;
+        void onMissionChange();
+    },
+});
+
+function pointLabel(p: PointPick): string {
+    return `${p.label} — ${p.lat.toFixed(5)}, ${p.lon.toFixed(5)}`;
+}
+
+const pointPlaceholder = computed(() => (points.value.length ? 'Select a point…' : 'No points in this mission'));
+
+const pointOptions = computed(() => [pointPlaceholder.value, ...points.value.map(pointLabel)]);
+
+const pointModel = computed<string>({
+    get: () => (selectedPoint.value ? pointLabel(selectedPoint.value) : pointPlaceholder.value),
+    set: (label) => {
+        if (label === pointPlaceholder.value) {
+            selectedPointId.value = undefined;
+            return;
+        }
+        const p = points.value.find(x => pointLabel(x) === label);
+        selectedPointId.value = p?.id;
+    },
+});
+
+function onFullTeamToggle(v: boolean): void {
+    form.fullTeam = v;
+    void onFullTeamChange();
+}
+
 // datetime-local (naive local) → UTC ISO 8601 with Z.
 function localInputToUTC(v: string): string | null {
     if (!v) return null;
@@ -519,6 +536,26 @@ function inputTypeFor(t: D4HCustomFieldType): string {
     }
 }
 
+// TablerEnum label ↔ option-id mapping for SINGLE_CHOICE custom fields.
+const CF_SINGLE_CHOICE_NONE = '—';
+
+function cfSingleChoiceOptions(f: D4HCustomField): string[] {
+    return [CF_SINGLE_CHOICE_NONE, ...f.options.map(o => o.label)];
+}
+
+function cfSingleChoiceLabel(f: D4HCustomField): string {
+    const opt = f.options.find(o => o.id === cfValues[f.id]);
+    return opt?.label ?? CF_SINGLE_CHOICE_NONE;
+}
+
+function onCfSingleChoiceChange(f: D4HCustomField, label: string): void {
+    if (label === CF_SINGLE_CHOICE_NONE) {
+        cfValues[f.id] = undefined;
+        return;
+    }
+    cfValues[f.id] = f.options.find(o => o.label === label)?.id;
+}
+
 function cfIsEmpty(f: D4HCustomField): boolean {
     const v = cfValues[f.id];
     if (f.type === 'MULTIPLE_CHOICE') return !Array.isArray(v) || v.length === 0;
@@ -528,6 +565,10 @@ function cfIsEmpty(f: D4HCustomField): boolean {
 
 const missingMandatory = computed(() =>
     customFields.value.filter(f => f.mandatory && cfIsEmpty(f)).map(f => f.title),
+);
+
+const missingMandatoryTitle = computed(() =>
+    missingMandatory.value.length === 1 ? 'Required Field Missing' : 'Required Fields Missing',
 );
 
 /** Assemble the incident POST's customFieldValues from filled fields only. */
@@ -557,6 +598,23 @@ const canSubmit = computed(() =>
     && !!startsAtUTC.value
     && missingMandatory.value.length === 0,
 );
+
+// Success/failure → TablerInlineAlert props.
+const resultAlert = computed(() => {
+    if (!result.value) return null;
+    if (result.value.ok) {
+        return {
+            severity: 'success' as const,
+            title: `Incident Created — D4H ID ${result.value.id}`,
+            description: `${result.value.reference ? `Ref ${result.value.reference}. ` : ''}Added to the Incidents list for this mission.`,
+        };
+    }
+    return {
+        severity: 'danger' as const,
+        title: 'Submit Failed',
+        description: [result.value.message, result.value.hint].filter(Boolean).join(' — '),
+    };
+});
 
 onMounted(async () => {
     config.value = await loadConfig();
