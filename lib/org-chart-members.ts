@@ -1,5 +1,5 @@
 // Extract D4H member ids from the incident-manager org chart tree
-// (`assignments_org_chart` in mission_schema.json).
+// (`assignments_org_chart` in *_DataSync.json / mission_schema.json).
 
 export interface OrgChartNodeSelf {
     type?: string;
@@ -50,4 +50,10 @@ export function orgChartFromSchemaValue(value: unknown): OrgChartTree {
 
 export function orgChartHasMembers(tree: OrgChartTree | null | undefined): boolean {
     return collectD4hMemberIds(tree).length > 0;
+}
+
+/** True when the tree has a node or children (IDs optional). */
+export function orgChartHasContent(tree: OrgChartTree | null | undefined): boolean {
+    if (!tree) return false;
+    return !!(tree.self || (tree.children && tree.children.length > 0));
 }

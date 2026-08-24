@@ -75,8 +75,9 @@
                     Linked mission for this incident: {{ linkedMissionName }}
                 </div>
                 <div class='form-text small text-white-50'>
-                    Roster is read from the incident-manager Assignments org chart
-                    (<code>assignments_org_chart</code> in mission_schema.json).
+                    Roster is read from the incident-manager Organization tab
+                    (<code>assignments_org_chart</code> in <code>*_DataSync.json</code>,
+                    or legacy <code>mission_schema.json</code>, on the management DataSync when present).
                 </div>
             </div>
 
@@ -95,16 +96,35 @@
                 </button>
             </div>
 
+            <div
+                v-if='chartLoaded && schemaMissionName'
+                class='form-text small text-white-50'
+            >
+                Read from {{ schemaMissionName }}<span v-if='schemaFileName'> / {{ schemaFileName }}</span>
+            </div>
+
             <TablerInlineAlert
                 v-if='chartError'
                 severity='danger'
                 :title='chartError'
             />
             <TablerInlineAlert
+                v-else-if='chartLoaded && emptyReason === "no-file"'
+                severity='warning'
+                title='No mission schema file found on this DataSync.'
+                description='Dual-sync incidents store the org chart on the management DataSync ({name} - MGMT) as *_DataSync.json. Confirm the incident is open in incident-manager and try Reload org chart.'
+            />
+            <TablerInlineAlert
+                v-else-if='chartLoaded && emptyReason === "empty-chart"'
+                severity='warning'
+                title='The org chart on this mission is empty.'
+                description='Add personnel on the incident-manager Organization tab, then Reload org chart.'
+            />
+            <TablerInlineAlert
                 v-else-if='chartLoaded && !rosterRows.length'
                 severity='warning'
                 title='No D4H members on the org chart for this mission.'
-                description='Add personnel in the incident-manager Assignments tab first.'
+                description='Add D4H personnel on the incident-manager Organization tab first.'
             />
 
             <div v-if='rosterRows.length'>
@@ -183,7 +203,10 @@ import { loadConfig, type D4HConfig } from '../lib/d4h-config.ts';
 import { loadCachedRoster } from '../lib/d4h-roster.ts';
 import type { D4HIncident, D4HMember, D4HRoster } from '../lib/d4h-types.ts';
 import { collectD4hMemberIds } from '../lib/org-chart-members.ts';
-import { loadOrgChartFromMission } from '../lib/mission-org-chart.ts';
+import {
+    loadOrgChartFromMission,
+    type OrgChartEmptyReason,
+} from '../lib/mission-org-chart.ts';
 import { submitRosterToActivity } from '../lib/submit-roster.ts';
 import { useMapStore } from '../../../src/stores/map.ts';
 import { db } from '../../../src/database.ts';
@@ -210,6 +233,9 @@ const linkedMissionGuid = ref<string | undefined>(undefined);
 const loadingChart = ref(false);
 const chartLoaded = ref(false);
 const chartError = ref<string | null>(null);
+const emptyReason = ref<OrgChartEmptyReason | null>(null);
+const schemaMissionName = ref('');
+const schemaFileName = ref('');
 const memberIds = ref<number[]>([]);
 
 const submitting = ref(false);
@@ -314,6 +340,9 @@ async function loadOrgChart(): Promise<void> {
     chartError.value = null;
     chartLoaded.value = false;
     memberIds.value = [];
+    emptyReason.value = null;
+    schemaMissionName.value = '';
+    schemaFileName.value = '';
 
     const guid = selectedMissionGuid.value;
     if (!guid) return;
@@ -322,10 +351,10 @@ async function loadOrgChart(): Promise<void> {
     try {
         const loaded = await loadOrgChartFromMission(guid);
         memberIds.value = collectD4hMemberIds(loaded.tree);
+        schemaMissionName.value = loaded.missionName;
+        schemaFileName.value = loaded.schemaFileName ?? '';
+        emptyReason.value = loaded.emptyReason ?? null;
         chartLoaded.value = true;
-        if (!memberIds.value.length) {
-            chartError.value = null;
-        }
     } catch (e) {
         chartError.value = (e as Error).message;
     } finally {
