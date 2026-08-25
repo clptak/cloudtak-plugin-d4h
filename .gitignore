@@ -6,12 +6,5 @@ dist/
 # spike artifacts may contain tokens if you tweak the env vars locally
 spike/**/*.local.sh
 spike/**/.env*
-# Local-only docs that may contain org-specific or API-dump data
-docs/HANDOFF-incident-entry.md
-docs/d4h_swagger.json
-docs/label-info-popup-pattern.md
-docs/PATTERN-overlay-attribute-autofill.md
-docs/PLAN-submit-incident.md
-docs/PLAN.md
 
 

@@ -1,0 +1,46 @@
+site_name: CloudTAK D4H Plugin Documentation
+site_url: https://clptak.github.io/cloudtak-d4h-plugin-docs/
+site_description: Documentation for the CloudTAK D4H Plugin
+
+theme:
+  name: material
+  palette:
+    # Matches the dark/light toggle and color scheme
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.sections
+    - navigation.expand
+    - content.code.copy
+    - search.suggest
+    - search.highlight
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.tabbed:
+      alternate_style: true
+  - tables
+  - attr_list
+
+nav:
+  - Home: index.md
+  - Installation: installation.md
+  - Security: SECURITY.md
+  - Usage Guide: usage.md

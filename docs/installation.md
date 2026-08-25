@@ -1,13 +1,4 @@
-# CloudTAK D4H PLUGIN
-
-[CloudTAK](https://github.com/dfpc-coe/CloudTAK/) plugin — [D4H](https://www.d4h.com/) [Team Manager](https://help.d4h.com/category/701-d4h-team-manager-a-beginners-guide) roster, incidents, and cross-plugin personnel/equipment source.
-
-## Features
-
-- Sync operational personnel, equipment, external resources, and incidents from D4H
-- **Hybrid persistence:** server-side Postgres sync on a schedule + local `db.kv` cache for instant UI
-- Group-filtered `/api/d4h/*` reads for other plugins
-- Submit incidents, rosters, and involved persons from DataSync missions
+# Installation
 
 ## Install
 
@@ -46,11 +37,3 @@ const { members } = await std('/api/d4h/members') as { members: import('./lib/d4
 ```
 
 See [STATUS.md](STATUS.md) for tables, endpoints, and filters.
-
-## Security
-
-See [SECURITY.md](SECURITY.md) for the no-secrets policy, token handling, and a pre-publish checklist.
-
-## License
-
-GNU Affero General Public License v3 — see [LICENSE](LICENSE).
