@@ -1,0 +1,803 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Documentation for the CloudTAK D4H Plugin">
+      
+      
+      
+        <link rel="canonical" href="https://clptak.github.io/cloudtak-d4h-plugin-docs/STATUS/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>cloudtak-plugin-d4h — Status - CloudTAK D4H Plugin Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#cloudtak-plugin-d4h-status" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="CloudTAK D4H Plugin Documentation" class="md-header__button md-logo" aria-label="CloudTAK D4H Plugin Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            CloudTAK D4H Plugin Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              cloudtak-plugin-d4h — Status
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="CloudTAK D4H Plugin Documentation" class="md-nav__button md-logo" aria-label="CloudTAK D4H Plugin Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    CloudTAK D4H Plugin Documentation
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../SECURITY/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Usage Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Architecture
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#d4h-api-calls-each-sync" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D4H API calls (each sync)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#filters-applied-before-storage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Filters applied before storage
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#where-data-is-stored" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where data is stored
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Where data is stored">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-capacitor-preferences-local-credentials-fallback-writes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Capacitor Preferences — local credentials (fallback + writes)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-postgres-hybrid-authoritative-shared-roster" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Postgres (hybrid) — authoritative shared roster
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-cloudtak-dexie-dbkv-non-authoritative-authorized-cache" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. CloudTAK Dexie db.kv — non-authoritative authorized cache
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#server-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Server API
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-other-plugins-should-consume-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How other plugins should consume it
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#net-status" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Net status
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="cloudtak-plugin-d4h-status">cloudtak-plugin-d4h — Status</h1>
+<p><em>Last updated: 2026-07-31. Grounded in the current code, not just the plan.</em></p>
+<p>Point-in-time status of where the plugin's data lives, what D4H returns on sync, what gets
+stored, and how other CloudTAK plugins can consume it. For design rationale see <code>docs/PLAN.md</code>.</p>
+<hr />
+<h2 id="architecture">Architecture</h2>
+<p><strong>Hybrid mode (preferred):</strong> when <code>server/plugin-d4h.ts</code> is installed into CloudTAK
+<code>api/stateless/routes/</code>, a system admin stores the D4H token in Postgres (<code>d4h_config</code>).
+The API pulls D4H on a schedule (and on admin <code>POST /api/d4h/sync</code>), writes normalized rows
+tagged with <code>default_groups</code>, and serves group-filtered reads. The browser caches the
+<strong>already-authorized</strong> response in <code>db.kv</code> for instant remounts.</p>
+<p><strong>Fallback:</strong> if the server route is missing or has no token, Sync now still runs
+client-direct from Preferences (same as before).</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>D4H API ──(admin / periodic)──► CloudTAK API (plugin-d4h.ts)
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>                                      │
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>                                      ▼
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>                               Postgres d4h_* tables   ← authoritative + groups[]
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>                                      │
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>                         GET /api/d4h/roster|members|…
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>                                      │
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>                                      ▼
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>                               Browser db.kv cache     ← non-authoritative view
+</code></pre></div>
+<p>Install: <code>./scripts/install.sh [/path/to/CloudTAK]</code> then rebuild the API image.</p>
+<p>Base path: <code>https://api.team-manager.{region}.d4h.com/v3/{context}/{contextId}/…</code>
+Pagination: <code>?page=0&amp;size=100</code> (0-indexed), deduped by record <code>id</code>.</p>
+<hr />
+<h2 id="d4h-api-calls-each-sync">D4H API calls (each sync)</h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Endpoint</th>
+<th>What D4H returns (typical)</th>
+<th>How the plugin uses it</th>
+<th>Persisted?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><strong><code>/members</code></strong> (+ optional <code>?status=OPERATIONAL</code>)</td>
+<td><code>{ results: [...] }</code> — <code>id</code>, <code>ref</code>, <code>name</code>, <code>position</code>, <code>status</code>, nested <code>email</code>, <code>mobile</code>, etc.</td>
+<td>Normalized to <code>D4HMember</code>. <strong>Kept only if <code>status === OPERATIONAL</code></strong>.</td>
+<td>Yes → Postgres <code>d4h_members</code> (+ <code>db.kv</code> cache)</td>
+</tr>
+<tr>
+<td>2</td>
+<td><strong><code>/equipment</code></strong></td>
+<td>Rows with kind/model/brand/category refs</td>
+<td>Normalized + filtered (operational + category keywords)</td>
+<td>Yes → <code>d4h_equipment</code></td>
+</tr>
+<tr>
+<td>3–5</td>
+<td>equipment-categories / brands / models</td>
+<td>Lookup tables</td>
+<td>Resolve titles onto equipment</td>
+<td>Not stored separately</td>
+</tr>
+<tr>
+<td>6–7</td>
+<td>member-qualifications + awards</td>
+<td>Catalog + member links</td>
+<td>Joined onto <code>members[].qualifications[]</code></td>
+<td>Yes (on members)</td>
+</tr>
+</tbody>
+</table>
+<p>Endpoints 3–7 are <strong>best-effort</strong> (404 → warning, sync continues). Raw D4H JSON is never cached.</p>
+<hr />
+<h2 id="filters-applied-before-storage">Filters applied before storage</h2>
+<table>
+<thead>
+<tr>
+<th>Dataset</th>
+<th>Filter</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Personnel</strong></td>
+<td><code>status === OPERATIONAL</code> only</td>
+</tr>
+<tr>
+<td><strong>Equipment — status</strong></td>
+<td><code>OPERATIONAL</code> or <code>OPERATIONAL*</code> prefix</td>
+</tr>
+<tr>
+<td><strong>Equipment — category</strong></td>
+<td>Title contains <code>vehicle</code>, <code>uas</code>, or <code>tech litter</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="where-data-is-stored">Where data is stored</h2>
+<h3 id="1-capacitor-preferences-local-credentials-fallback-writes">1. Capacitor <code>Preferences</code> — local credentials (fallback + writes)</h3>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Contents</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>d4h-config-v1</code></td>
+<td><code>{ region, baseUrl?, context, contextId, token }</code></td>
+</tr>
+</tbody>
+</table>
+<p>Still required for Submit Incident / Roster / Subject. Optional for roster read when server sync is configured.</p>
+<h3 id="2-postgres-hybrid-authoritative-shared-roster">2. Postgres (hybrid) — authoritative shared roster</h3>
+<table>
+<thead>
+<tr>
+<th>Table</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>d4h_config</code></td>
+<td>Server token, interval, <code>default_groups</code></td>
+</tr>
+<tr>
+<td><code>d4h_members</code> / <code>d4h_equipment</code> / <code>d4h_external_resources</code> / <code>d4h_incidents</code></td>
+<td>Normalized rows + <code>groups TEXT[]</code></td>
+</tr>
+<tr>
+<td><code>d4h_meta</code></td>
+<td>Last-sync header / warnings JSON</td>
+</tr>
+</tbody>
+</table>
+<h3 id="3-cloudtak-dexie-dbkv-non-authoritative-authorized-cache">3. CloudTAK Dexie <code>db.kv</code> — non-authoritative authorized cache</h3>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Contents</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>d4h:roster</code> / <code>d4h:meta</code></td>
+<td>Filtered view for this caller</td>
+</tr>
+</tbody>
+</table>
+<p>Never holds the D4H token. Prefer <code>GET /api/d4h/members</code> via <code>std()</code> for cross-plugin sharing.</p>
+<hr />
+<h2 id="server-api">Server API</h2>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Auth</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GET</code></td>
+<td><code>/api/d4h/config</code></td>
+<td>auth</td>
+<td>Redacted config</td>
+</tr>
+<tr>
+<td><code>PUT</code></td>
+<td><code>/api/d4h/config</code></td>
+<td>system admin</td>
+<td>Save token / interval / default groups</td>
+</tr>
+<tr>
+<td><code>POST</code></td>
+<td><code>/api/d4h/sync</code></td>
+<td>system admin</td>
+<td>Pull D4H → Postgres</td>
+</tr>
+<tr>
+<td><code>GET</code></td>
+<td><code>/api/d4h/roster</code></td>
+<td>auth</td>
+<td>Group-filtered full roster</td>
+</tr>
+<tr>
+<td><code>GET</code></td>
+<td><code>/api/d4h/members</code></td>
+<td>auth</td>
+<td>Group-filtered members (<code>?ref=</code> / <code>?callsign=</code>)</td>
+</tr>
+<tr>
+<td><code>GET</code></td>
+<td><code>/api/d4h/equipment</code></td>
+<td>auth</td>
+<td>Group-filtered equipment</td>
+</tr>
+<tr>
+<td><code>GET</code></td>
+<td><code>/api/d4h/meta</code></td>
+<td>auth</td>
+<td>Last sync header</td>
+</tr>
+</tbody>
+</table>
+<p>Visibility: row <code>groups</code> ∩ caller's active TAK groups. System/agency admins see all.
+v1 tagging: every row gets <code>d4h_config.default_groups</code>.</p>
+<hr />
+<h2 id="how-other-plugins-should-consume-it">How other plugins should consume it</h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="k">import</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">std</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="kr">from</span><span class="w"> </span><span class="s1">'../../src/std.ts'</span><span class="p">;</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="kd">const</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">members</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">std</span><span class="p">(</span><span class="s1">'/api/d4h/members'</span><span class="p">)</span><span class="w"> </span><span class="kr">as</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">members</span><span class="o">:</span><span class="w"> </span><span class="kt">D4HMember</span><span class="p">[]</span><span class="w"> </span><span class="p">};</span>
+</code></pre></div>
+<hr />
+<h2 id="net-status">Net status</h2>
+<table>
+<thead>
+<tr>
+<th>Area</th>
+<th>State</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Members / equipment / quals / resources / incidents</td>
+<td>Working (client + server sync)</td>
+</tr>
+<tr>
+<td>Hybrid Postgres + periodic sync</td>
+<td>Built (<code>server/plugin-d4h.ts</code>, <code>server/d4h-sync.ts</code>)</td>
+</tr>
+<tr>
+<td>TAK-group access control</td>
+<td>Built via <code>default_groups</code> + caller group intersect</td>
+</tr>
+<tr>
+<td>Cross-plugin sharing</td>
+<td>Prefer <code>/api/d4h/members</code>; <code>db.kv</code> is a view cache</td>
+</tr>
+<tr>
+<td>Per-member D4H→TAK group mapping</td>
+<td>Deferred</td>
+</tr>
+<tr>
+<td>Client-direct fallback</td>
+<td>Still available when server route/token absent</td>
+</tr>
+</tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.tracking", "navigation.sections", "navigation.expand", "content.code.copy", "search.suggest", "search.highlight"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>
