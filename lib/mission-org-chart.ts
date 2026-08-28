@@ -89,9 +89,9 @@ async function fetchMissionFileText(hash: string, name: string): Promise<string>
 
 async function fetchMissionByName(name: string): Promise<SchemaMissionRef | null> {
     try {
-        const res = await server.GET('/api/marti/missions/{:name}', {
+        const res = await server.GET('/api/marti/missions/{:guid}', {
             params: {
-                path: { ':name': name },
+                path: { ':guid': name },
                 query: { changes: false, logs: false },
             },
         });
