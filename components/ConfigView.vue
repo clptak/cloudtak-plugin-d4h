@@ -159,6 +159,14 @@
                 Used for Submit Incident/Roster/Subject and for Sync when the server route is not configured.
             </p>
 
+            <p
+                v-if='deploymentConfigured'
+                class='small text-white-50 mb-0'
+            >
+                These values are already filled in for this CloudTAK.
+                Edit a field only to override the deployment value.
+            </p>
+
             <form
                 class='d-flex flex-column gap-2'
                 @submit.prevent='onSave'
@@ -293,9 +301,10 @@ import {
     TablerBorder, TablerEnum, TablerInlineAlert, TablerInput,
 } from '@tak-ps/vue-tabler';
 import {
-    loadConfig, saveConfig, clearConfig, regionBaseUrl,
-    type D4HConfig, type D4HRegion, type D4HContext,
+    loadConfigDraft, saveConfig, clearConfig, regionBaseUrl,
+    type D4HConfig, type D4HConfigDraft, type D4HRegion, type D4HContext,
 } from '../lib/d4h-config.ts';
+import { hasDeploymentDefaults } from '../lib/deploymentDefaults.ts';
 import { testConnection } from '../lib/d4h-client.ts';
 import { getServerConfig, updateServerConfig } from '../lib/d4h-api.ts';
 import ProfileConfig from '../../../src/base/profile.ts';
@@ -331,6 +340,8 @@ const serverForm = reactive({
     lastSyncStatus:       null as string | null,
     lastSyncError:        null as string | null,
 });
+
+const deploymentConfigured = hasDeploymentDefaults();
 
 const saving         = ref(false);
 const serverSaving   = ref(false);
@@ -401,17 +412,19 @@ async function loadServerSection(): Promise<void> {
     }
 }
 
+function applyDraft(draft: D4HConfigDraft): void {
+    form.region    = draft.region;
+    form.baseUrl   = draft.baseUrl;
+    form.context   = draft.context;
+    form.contextId = draft.contextId;
+    form.token     = draft.token;
+}
+
 onMounted(async () => {
     document.addEventListener('click', onDocumentClick);
-    const existing = await loadConfig();
-    if (existing) {
-        form.region    = existing.region;
-        form.baseUrl   = existing.baseUrl ?? '';
-        form.context   = existing.context;
-        form.contextId = existing.contextId;
-        form.token     = existing.token;
-        hasSaved.value = true;
-    }
+    const draft = await loadConfigDraft();
+    applyDraft(draft);
+    hasSaved.value = draft.token.length > 0;
     try {
         const adminCfg = await ProfileConfig.get('system_admin');
         isSystemAdmin.value = !!(adminCfg?.value);
@@ -528,10 +541,9 @@ async function onTest(): Promise<void> {
 
 async function onClear(): Promise<void> {
     await clearConfig();
-    form.baseUrl   = '';
-    form.contextId = null;
-    form.token     = '';
-    hasSaved.value = false;
+    const draft = await loadConfigDraft();
+    applyDraft(draft);
+    hasSaved.value = draft.token.length > 0;
     status.value   = { kind: 'info', title: 'Cleared saved local config.' };
     emit('cleared');
 }

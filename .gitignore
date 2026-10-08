@@ -7,4 +7,7 @@ dist/
 spike/**/*.local.sh
 spike/**/.env*
 
+# Deployment settings compiled into the web bundle. Copy from config.local.example.ts.
+config.local.ts
+
 
