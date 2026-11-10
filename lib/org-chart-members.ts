@@ -1,5 +1,5 @@
 // Extract D4H member ids from the incident-manager org chart tree
-// (`assignments_org_chart` in *_DataSync.json / mission_schema.json).
+// (Mission Property `s.assignments-org-chart`, or legacy `assignments_org_chart` in mission_schema.json).
 
 export interface OrgChartNodeSelf {
     type?: string;

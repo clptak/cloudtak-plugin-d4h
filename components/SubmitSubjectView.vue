@@ -70,6 +70,13 @@
                     </button>
                 </div>
 
+                <div
+                    v-if='subjectsLoaded && subjectsSource'
+                    class='form-text small text-white-50'
+                >
+                    Read from {{ subjectsSource }}
+                </div>
+
                 <TablerInlineAlert
                     v-if='loadError'
                     severity='danger'
@@ -79,8 +86,8 @@
                 <TablerInlineAlert
                     v-else-if='subjectsLoaded && !subjects.length'
                     severity='warning'
-                    title='No Subject Logs'
-                    description='No subject-information logs on this mission. Enter subject details in the incident-manager Logger → Subject Information tab first.'
+                    title='No Subjects'
+                    description='No subjects found for this incident. Enter subject details in the incident-manager Logger → Subject Information tab and Save, then Reload Subjects. Subjects are read from the management DataSync ({name} - MGMT), so you need access to that channel.'
                 />
 
                 <TablerInlineAlert
@@ -437,6 +444,7 @@ const subjectsLoaded = ref(false);
 const loadingSubjects = ref(false);
 const selectedSubjectCaseId = ref('');
 const loadError = ref<string | null>(null);
+const subjectsSource = ref('');
 
 const involvementTypes = ref<D4HInvolvementType[]>([]);
 const outcomes = ref<D4HInvolvedOutcome[]>([]);
@@ -730,6 +738,7 @@ async function loadSubjects(): Promise<void> {
     subjectsLoaded.value = false;
     subjects.value = [];
     selectedSubjectCaseId.value = '';
+    subjectsSource.value = '';
 
     const guid = selectedMissionGuid.value;
     if (!guid) return;
@@ -738,6 +747,7 @@ async function loadSubjects(): Promise<void> {
     try {
         const loaded = await loadSubjectsFromMission(guid);
         subjects.value = loaded.subjects;
+        subjectsSource.value = `${loaded.missionName} / ${loaded.source}`;
         subjectsLoaded.value = true;
         if (loaded.subjects.length) {
             selectedSubjectCaseId.value = loaded.subjects[0].subjectCaseID;

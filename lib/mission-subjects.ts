@@ -1,37 +1,32 @@
-// Load subject-information logs from a DataSync mission (incident-manager Logger tab).
+// Load incident-manager subjects (Logger → Subject Information) for subject submit.
+//
+// TAK Server 5.9+: Mission Property `s.incident-response.subjects` on the
+// management DataSync (`{name} - MGMT`).
+// Legacy, in order: incident_response.subjects in mission_schema.json on that
+// DataSync, then `subject-information` logs on the selected mission.
 
 import Subscription from '../../../src/base/subscription.ts';
-import { db } from '../../../src/database.ts';
-import { parseSubjectsFromLogs, type ParsedSubject } from './subject-info.ts';
-
-async function missionTokenForGuid(guid: string): Promise<string | undefined> {
-    const row = await db.subscription.get(guid);
-    if (row?.token?.trim()) return row.token.trim();
-
-    try {
-        const raw = sessionStorage.getItem('incident-manager:active-mission');
-        if (!raw) return undefined;
-        const parsed = JSON.parse(raw) as { guid?: string; missionToken?: string; token?: string };
-        if (parsed.guid !== guid) return undefined;
-        return parsed.missionToken?.trim() || parsed.token?.trim() || undefined;
-    } catch {
-        return undefined;
-    }
-}
+import { missionTokenForGuid, resolveMgmtMission, selectedMission } from './mgmt-mission.ts';
+import {
+    getMissionPropertyJson,
+    SUBJECTS_KEY,
+    usesMissionProperties,
+} from './mission-properties.ts';
+import { loadLegacySchemaFile } from './legacy-schema.ts';
+import { parseSubjectsFromLogs, subjectsFromSchemaValue, type ParsedSubject } from './subject-info.ts';
 
 export interface LoadedMissionSubjects {
     subjects: ParsedSubject[];
     missionGuid: string;
     missionName: string;
+    /** Where the subjects came from: the property key, a legacy file name, or "mission logs". */
+    source: string;
 }
 
-export async function loadSubjectsFromMission(missionGuid: string): Promise<LoadedMissionSubjects> {
-    const row = await db.subscription.get(missionGuid);
-    const missionName = row?.name ?? missionGuid;
-    const missionToken = await missionTokenForGuid(missionGuid);
-
-    const sub = await Subscription.load(missionGuid, {
-        missiontoken: missionToken,
+async function subjectsFromLogs(missionGuid: string): Promise<LoadedMissionSubjects> {
+    const mission = await selectedMission(missionGuid);
+    const sub = await Subscription.load(mission.guid, {
+        missiontoken: mission.token,
         subscribed: true,
     });
     if (sub.fetch) await sub.fetch();
@@ -44,6 +39,33 @@ export async function loadSubjectsFromMission(missionGuid: string): Promise<Load
             dtg: typeof log.dtg === 'string' ? log.dtg : undefined,
         })),
     );
+    return { subjects, missionGuid: mission.guid, missionName: mission.name, source: 'mission logs' };
+}
 
-    return { subjects, missionGuid, missionName };
+export async function loadSubjectsFromMission(missionGuid: string): Promise<LoadedMissionSubjects> {
+    const mgmt = await resolveMgmtMission(missionGuid);
+    const token = mgmt.token || await missionTokenForGuid(mgmt.guid);
+
+    if (await usesMissionProperties(mgmt.guid, token)) {
+        const value = await getMissionPropertyJson<unknown>(mgmt.guid, SUBJECTS_KEY, token);
+        return {
+            subjects: subjectsFromSchemaValue(value),
+            missionGuid: mgmt.guid,
+            missionName: mgmt.name,
+            source: SUBJECTS_KEY,
+        };
+    }
+
+    const legacy = await loadLegacySchemaFile({ ...mgmt, token });
+    const fromFile = subjectsFromSchemaValue(legacy?.schema.incident_response?.subjects);
+    if (legacy && fromFile.length) {
+        return {
+            subjects: fromFile,
+            missionGuid: mgmt.guid,
+            missionName: mgmt.name,
+            source: legacy.fileName,
+        };
+    }
+
+    return subjectsFromLogs(missionGuid);
 }
