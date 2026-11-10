@@ -1,5 +1,9 @@
-// Subject Information parsing — mirrored from incident-manager subjectInfo.ts
-// so this plugin can read subject logs from DataSync missions without a cross-plugin import.
+// Subject Information parsing — mirrored from incident-manager subjectInfo.ts and
+// subjectsPersistence.ts so this plugin can read subjects without a cross-plugin import.
+//
+// Primary source: Mission Property `s.incident-response.subjects` on the MGMT
+// DataSync, an array of `{ initial_information: SubjectForm, lpq }`.
+// Fallback: `subject-information` mission logs (older incidents).
 
 export const SUBJECT_KEYWORD = 'subject-information';
 
@@ -11,13 +15,15 @@ export interface SubjectForm {
     subjectDateOfBirth: string;
     subjectAge: string;
     subjectGender: string;
-    subjectCategory: string;
+    subjectProfile: string;
     subjectDescription: string;
     subjectHeight: string;
     subjectWeight: string;
     subjectHairColor: string;
-    subjectFacialHair: string;
-    subjectGlasses: string;
+    /** true = Yes, false = No, null = unset */
+    subjectFacialHair: boolean | null;
+    /** true = Yes, false = No, null = unset */
+    subjectGlasses: boolean | null;
     subjectDistinguishingMarks: string;
     subjectClothing: string;
     subjectFootwear: string;
@@ -72,6 +78,50 @@ function hasValue(value: string | undefined): value is string {
     return !!value?.trim();
 }
 
+/** Labels for incident-manager's removed Category field, so old records still resolve. */
+const LEGACY_CATEGORY_LABELS: Record<string, string> = {
+    hiker: 'Hiker',
+    hunter: 'Hunter',
+    child: 'Child',
+    elderly: 'Elderly',
+    mental_illness: 'Mental Illness',
+    alzheimer_dementia: "Alzheimer's/Dementia",
+    substance_abuse: 'Substance Abuse',
+    other: 'Other',
+};
+
+function stringValue(value: unknown): string {
+    return typeof value === 'string' ? value.trim() : '';
+}
+
+/** First non-empty of subjectProfile, the old subjectType, then the old category label. */
+export function legacySubjectProfile(raw: { subjectProfile?: unknown; subjectType?: unknown; subjectCategory?: unknown }): string {
+    const profile = stringValue(raw.subjectProfile);
+    if (profile) return profile;
+    const type = stringValue(raw.subjectType);
+    if (type) return type;
+    const category = stringValue(raw.subjectCategory);
+    if (!category) return '';
+    return LEGACY_CATEGORY_LABELS[category] ?? category;
+}
+
+/** Parse Yes/No from a boolean, keyword, or legacy free text. */
+export function parseSubjectYesNo(value: unknown): boolean | null {
+    if (value === true || value === false) return value;
+    if (typeof value !== 'string') return null;
+    const v = value.trim().toLowerCase();
+    if (!v) return null;
+    if (v === 'true' || v === 'yes' || v === 'y' || v === '1') return true;
+    if (v === 'false' || v === 'no' || v === 'n' || v === '0') return false;
+    return null;
+}
+
+export function formatSubjectYesNo(value: boolean | null | undefined): string {
+    if (value === true) return 'Yes';
+    if (value === false) return 'No';
+    return '';
+}
+
 export function kwValue(keywords: string[] | undefined, prefix: string): string {
     const tag = keywords?.find((k) => k.startsWith(prefix));
     return tag ? tag.slice(prefix.length) : '';
@@ -84,13 +134,17 @@ export function fieldsFromLog(keywords?: string[]): SubjectForm {
         subjectDateOfBirth: kwValue(keywords, 'dob:'),
         subjectAge: kwValue(keywords, 'age:'),
         subjectGender: kwValue(keywords, 'gender:'),
-        subjectCategory: kwValue(keywords, 'category:'),
+        subjectProfile: legacySubjectProfile({
+            subjectProfile: kwValue(keywords, 'subjectProfile:'),
+            subjectType: kwValue(keywords, 'subjectType:'),
+            subjectCategory: kwValue(keywords, 'category:'),
+        }),
         subjectDescription: kwValue(keywords, 'description:'),
         subjectHeight: kwValue(keywords, 'height:'),
         subjectWeight: kwValue(keywords, 'weight:'),
         subjectHairColor: kwValue(keywords, 'hairColor:'),
-        subjectFacialHair: kwValue(keywords, 'facialHair:'),
-        subjectGlasses: kwValue(keywords, 'glasses:'),
+        subjectFacialHair: parseSubjectYesNo(kwValue(keywords, 'facialHair:')),
+        subjectGlasses: parseSubjectYesNo(kwValue(keywords, 'glasses:')),
         subjectDistinguishingMarks: kwValue(keywords, 'distinguishingMarks:'),
         subjectClothing: kwValue(keywords, 'clothing:'),
         subjectFootwear: kwValue(keywords, 'footwear:'),
@@ -139,10 +193,56 @@ export function parseSubjectsFromLogs(logs: SubjectLogInput[]): ParsedSubject[] 
 
 export function hasFilledSubjectFields(f: SubjectForm): boolean {
     return [
-        f.subjectName, f.subjectDateOfBirth, f.subjectAge, f.subjectGender, f.subjectCategory,
+        f.subjectName, f.subjectDateOfBirth, f.subjectAge, f.subjectGender, f.subjectProfile,
         f.subjectDescription, f.subjectHeight, f.subjectWeight, f.subjectHairColor,
-        f.subjectFacialHair, f.subjectGlasses, f.subjectDistinguishingMarks, f.subjectClothing,
+        f.subjectDistinguishingMarks, f.subjectClothing,
         f.subjectFootwear, f.subjectVehicle, f.subjectMedicalConditions, f.subjectExperience,
         f.subjectEquipment,
-    ].some((v) => hasValue(v));
+    ].some((v) => hasValue(v))
+        || f.subjectFacialHair !== null
+        || f.subjectGlasses !== null;
+}
+
+const STRING_INFO_KEYS = [
+    'subjectCaseID', 'subjectName', 'subjectDateOfBirth', 'subjectAge', 'subjectGender',
+    'subjectDescription', 'subjectHeight', 'subjectWeight', 'subjectHairColor',
+    'subjectDistinguishingMarks', 'subjectClothing', 'subjectFootwear', 'subjectVehicle',
+    'subjectMedicalConditions', 'subjectExperience', 'subjectEquipment', 'subjectPhoto',
+    'subjectIppFromTak', 'subjectIpp', 'subjectTimeWentMissing', 'subjectTimeReportedMissing',
+    'subjectReportedMissingBy',
+] as const satisfies readonly (keyof SubjectForm)[];
+
+/** One `initial_information` record from incident_response.subjects → SubjectForm. */
+export function subjectFormFromInitialInformation(info: unknown): SubjectForm {
+    const raw = (info && typeof info === 'object' ? info : {}) as Record<string, unknown>;
+    const form = fieldsFromLog([]);
+    for (const key of STRING_INFO_KEYS) {
+        const value = raw[key];
+        if (typeof value === 'string') form[key] = value;
+    }
+    form.subjectProfile = legacySubjectProfile(raw);
+    form.subjectFacialHair = parseSubjectYesNo(raw.subjectFacialHair);
+    form.subjectGlasses = parseSubjectYesNo(raw.subjectGlasses);
+    if (!form.subjectCaseID) form.subjectCaseID = '01';
+    return form;
+}
+
+/**
+ * Parse incident_response.subjects (the `s.incident-response.subjects`
+ * property value): `[{ initial_information, lpq }]`. Malformed entries and
+ * legacy `{}` values are skipped. Last entry per subject number wins.
+ */
+export function subjectsFromSchemaValue(value: unknown): ParsedSubject[] {
+    if (!Array.isArray(value)) return [];
+    const byNumber = new Map<string, ParsedSubject>();
+    for (const entry of value) {
+        if (!entry || typeof entry !== 'object' || Array.isArray(entry)) continue;
+        const info = (entry as { initial_information?: unknown }).initial_information;
+        if (!info || typeof info !== 'object') continue;
+        const form = subjectFormFromInitialInformation(info);
+        byNumber.set(form.subjectCaseID, { ...form, updatedAt: 0, rawTime: '' });
+    }
+    return [...byNumber.values()].sort(
+        (a, b) => Number.parseInt(a.subjectCaseID, 10) - Number.parseInt(b.subjectCaseID, 10),
+    );
 }

@@ -1,5 +1,5 @@
 import type { SubjectForm } from './subject-info.ts';
-import { effectiveSubjectAge } from './subject-info.ts';
+import { effectiveSubjectAge, formatSubjectYesNo } from './subject-info.ts';
 import type { D4HInvolvedPersonCreate, D4HInvolvedOutcome } from './d4h-client.ts';
 
 export interface InvolvedPersonFormState {
@@ -56,13 +56,13 @@ function noteLine(label: string, value?: string): string | null {
 /** Subject-only fields → involvementNotes (D4H has no direct columns for these). */
 function involvementNotesFromSubject(s: SubjectForm): string {
     const lines = [
-        noteLine('Category', s.subjectCategory),
+        noteLine('Profile', s.subjectProfile),
         noteLine('Description', s.subjectDescription),
         noteLine('Height', s.subjectHeight),
         noteLine('Weight', s.subjectWeight),
         noteLine('Hair color', s.subjectHairColor),
-        noteLine('Facial hair', s.subjectFacialHair),
-        noteLine('Glasses', s.subjectGlasses),
+        noteLine('Facial hair', formatSubjectYesNo(s.subjectFacialHair)),
+        noteLine('Glasses', formatSubjectYesNo(s.subjectGlasses)),
         noteLine('Distinguishing marks', s.subjectDistinguishingMarks),
         noteLine('Clothing', s.subjectClothing),
         noteLine('Footwear', s.subjectFootwear),
@@ -78,7 +78,7 @@ function involvementNotesFromSubject(s: SubjectForm): string {
     return lines.join('\n');
 }
 
-/** Pre-fill D4H involved-person fields from a mission subject log. */
+/** Pre-fill D4H involved-person fields from an incident-manager subject. */
 export function involvedPersonFormFromSubject(s: SubjectForm): InvolvedPersonFormState {
     const age = effectiveSubjectAge(s);
     return {

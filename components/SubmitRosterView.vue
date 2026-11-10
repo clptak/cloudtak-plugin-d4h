@@ -75,9 +75,10 @@
                     Linked mission for this incident: {{ linkedMissionName }}
                 </div>
                 <div class='form-text small text-white-50'>
-                    Roster is read from the incident-manager Organization tab
-                    (<code>assignments_org_chart</code> in <code>*_DataSync.json</code>,
-                    or legacy <code>mission_schema.json</code>, on the management DataSync when present).
+                    Roster is read from the incident-manager Organization tab: the
+                    <code>s.assignments-org-chart</code> Mission Property on the management
+                    DataSync (<code>{name} - MGMT</code>). Incidents not yet on Mission Properties
+                    fall back to <code>mission_schema.json</code>.
                 </div>
             </div>
 
@@ -97,10 +98,10 @@
             </div>
 
             <div
-                v-if='chartLoaded && schemaMissionName'
+                v-if='chartLoaded && sourceMissionName'
                 class='form-text small text-white-50'
             >
-                Read from {{ schemaMissionName }}<span v-if='schemaFileName'> / {{ schemaFileName }}</span>
+                Read from {{ sourceMissionName }}<span v-if='sourceName'> / {{ sourceName }}</span>
             </div>
 
             <TablerInlineAlert
@@ -109,10 +110,10 @@
                 :title='chartError'
             />
             <TablerInlineAlert
-                v-else-if='chartLoaded && emptyReason === "no-file"'
+                v-else-if='chartLoaded && emptyReason === "no-data"'
                 severity='warning'
-                title='No mission schema file found on this DataSync.'
-                description='Dual-sync incidents store the org chart on the management DataSync ({name} - MGMT) as *_DataSync.json. Confirm the incident is open in incident-manager and try Reload org chart.'
+                title='No org chart found for this incident.'
+                description='incident-manager stores the org chart on the management DataSync ({name} - MGMT). Confirm you can see that DataSync (management channel) and that the incident has an org chart, then Reload org chart.'
             />
             <TablerInlineAlert
                 v-else-if='chartLoaded && emptyReason === "empty-chart"'
@@ -234,8 +235,8 @@ const loadingChart = ref(false);
 const chartLoaded = ref(false);
 const chartError = ref<string | null>(null);
 const emptyReason = ref<OrgChartEmptyReason | null>(null);
-const schemaMissionName = ref('');
-const schemaFileName = ref('');
+const sourceMissionName = ref('');
+const sourceName = ref('');
 const memberIds = ref<number[]>([]);
 
 const submitting = ref(false);
@@ -341,8 +342,8 @@ async function loadOrgChart(): Promise<void> {
     chartLoaded.value = false;
     memberIds.value = [];
     emptyReason.value = null;
-    schemaMissionName.value = '';
-    schemaFileName.value = '';
+    sourceMissionName.value = '';
+    sourceName.value = '';
 
     const guid = selectedMissionGuid.value;
     if (!guid) return;
@@ -351,8 +352,8 @@ async function loadOrgChart(): Promise<void> {
     try {
         const loaded = await loadOrgChartFromMission(guid);
         memberIds.value = collectD4hMemberIds(loaded.tree);
-        schemaMissionName.value = loaded.missionName;
-        schemaFileName.value = loaded.schemaFileName ?? '';
+        sourceMissionName.value = loaded.missionName;
+        sourceName.value = loaded.source ?? '';
         emptyReason.value = loaded.emptyReason ?? null;
         chartLoaded.value = true;
     } catch (e) {
