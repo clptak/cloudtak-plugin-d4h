@@ -74,7 +74,7 @@
                             </button>
                         </div>
                         <div class='form-text small text-white-50'>
-                            Reads attributes from overlays on your map. Mapped overlays that are off are shown briefly while detecting, then hidden again (Inspect still needs them on). The map recenters on the point first.
+                            Detect reads the mapped overlays' data at the point directly — no overlay needs to be added or turned on, and the map does not move. Inspect only sees overlays that are on, and recenters the map.
                             <span v-if='hasOverlayMapping'>Mapped fields auto-detect when you pick a point; use the button to re-run.</span>
                             <span v-else>Add <code>overlayFieldMap</code> rows to <code>config.local.ts</code> (see <code>config.local.example.ts</code>) and rebuild to enable auto-fill.</span>
                         </div>
@@ -148,12 +148,6 @@
                             v-if='detectStatus'
                             class='mt-1 small'
                         >
-                            <div
-                                v-if='detectStatus.shown.length'
-                                class='text-white-50'
-                            >
-                                Shown while detecting: {{ detectStatus.shown.join(', ') }}
-                            </div>
                             <div
                                 v-for='(a, i) in detectStatus.applied'
                                 :key='"a" + i'
@@ -402,13 +396,13 @@ import {
 
 import { OVERLAY_FIELD_MAP } from '../lib/overlay-field-map.ts';
 import OverlayManager from '../../../src/base/overlay.ts';
-import { showLayersForDetect, type LayerVisibilityMap } from '../lib/overlay-ensure.ts';
+import { readOverlaysAtPoint, type LoadedOverlay } from '../lib/overlay-tiles.ts';
+import { overlayTileApi } from '../lib/overlay-tile-api.ts';
 import { incidentFromCreateResponse } from '../lib/d4h-normalize.ts';
 import { upsertCachedIncident } from '../lib/d4h-roster.ts';
 import {
     inspectAtPoint,
     debugAtPoint,
-    detectValues,
     normalizeLabel,
     type MapLike,
     type OverlayLike,
@@ -445,7 +439,7 @@ const hasOverlayMapping = OVERLAY_FIELD_MAP.length > 0;
 const inspectResults = ref<InspectResult[] | null>(null);
 const inspectDebug = ref<DetectDebug | null>(null);
 const detecting = ref(false);
-const detectStatus = ref<{ applied: string[]; unmatched: string[]; shown: string[] } | null>(null);
+const detectStatus = ref<{ applied: string[]; unmatched: string[] } | null>(null);
 // Field id → entered value. Heterogeneous by field type: string for text/number/date/time,
 // number for SINGLE_CHOICE, number[] for MULTIPLE_CHOICE — hence `any` for the v-model slot.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -662,7 +656,7 @@ async function loadCustomFields(): Promise<void> {
 }
 
 // ── Overlay attribute detection ────────────────────────────────────────────────
-type RecenterMap = MapLike & LayerVisibilityMap & {
+type RecenterMap = MapLike & {
     jumpTo(opts: { center: [number, number] }): void;
     once(ev: string, cb: () => void): void;
 };
@@ -672,12 +666,8 @@ function loadedOverlays(): OverlayLike[] {
 }
 
 /** Recenter the map on the point so the overlay tiles render there, then wait for idle. */
-function currentMap(): RecenterMap | undefined {
-    return useMapStore().map as unknown as RecenterMap | undefined;
-}
-
 async function recenterTo(lonLat: [number, number]): Promise<MapLike | null> {
-    const map = currentMap();
+    const map = useMapStore().map as unknown as RecenterMap | undefined;
     if (!map) return null;
     map.jumpTo({ center: lonLat });
     await new Promise<void>((resolve) => {
@@ -707,29 +697,37 @@ async function onDetect(): Promise<void> {
     detecting.value = true;
     inspectResults.value = null;
     inspectDebug.value = null;
-    const liveMap = currentMap();
-    // Show mapped layers that are off before recentering, so their tiles load for the idle wait.
-    const shown = liveMap
-        ? showLayersForDetect(liveMap, OverlayManager.loaded, OVERLAY_FIELD_MAP.map((m) => m.overlayLayerId))
-        : null;
     try {
-        const lonLat: [number, number] = [selectedPoint.value.lon, selectedPoint.value.lat];
-        const map = await recenterTo(lonLat);
-        if (!map) return;
-        applyDetected(detectValues(map, lonLat, OVERLAY_FIELD_MAP), shown?.shown ?? [], shown?.missing ?? []);
+        // Reads the overlays' tiles from CloudTAK's API: no map move, no overlay needs to be on.
+        const read = await readOverlaysAtPoint(
+            [selectedPoint.value.lon, selectedPoint.value.lat],
+            OVERLAY_FIELD_MAP,
+            overlayTileApi,
+            OverlayManager.loaded as unknown as LoadedOverlay[],
+        );
+        applyDetected(read.results, read.missing, read.unreadable);
+    } catch (err) {
+        detectStatus.value = {
+            applied: [],
+            unmatched: [`Overlay detection failed: ${err instanceof Error ? err.message : String(err)}`],
+        };
     } finally {
-        shown?.restore();
         detecting.value = false;
     }
 }
 
-function applyDetected(results: DetectResult[], shown: string[], missingLayers: string[]): void {
+function applyDetected(results: DetectResult[], missingLayers: string[], unreadableLayers: string[]): void {
     const applied: string[] = [];
     const unmatched: string[] = [];
     const missing = new Set(missingLayers);
+    const unreadable = new Set(unreadableLayers);
     for (const r of results) {
         if (missing.has(r.overlayLayerId)) {
-            unmatched.push(`${r.overlayLayerId}: overlay not on your map (add it in Overlays)`);
+            unmatched.push(`${r.overlayLayerId}: no overlay you can access has this layer (check overlayFieldMap in config.local.ts)`);
+            continue;
+        }
+        if (unreadable.has(r.overlayLayerId)) {
+            unmatched.push(`${r.overlayLayerId}: could not read this overlay — fill the field manually`);
             continue;
         }
         const f = customFields.value.find(cf => cf.id === r.customFieldId);
@@ -752,11 +750,11 @@ function applyDetected(results: DetectResult[], shown: string[], missingLayers: 
             applied.push(`${f.title} → ${r.value}`);
         }
     }
-    detectStatus.value = { applied, unmatched, shown };
+    detectStatus.value = { applied, unmatched };
 }
 
-// Auto-detect the moment a point is picked (only if a mapping exists). The detect path recenters
-// the map on the point — acceptable here because the user just chose that point.
+// Auto-detect the moment a point is picked (only if a mapping exists). Detect reads tiles from the
+// API, so it neither moves the map nor needs any overlay on.
 watch(selectedPointId, (id) => {
     if (id != null && hasOverlayMapping) void onDetect();
 });

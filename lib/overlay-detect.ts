@@ -1,4 +1,5 @@
-// Query ArcGIS/GeoJSON overlay attributes at a point, for the Submit Incident tab.
+// Map-based overlay helpers for the Submit Incident tab: Inspect (author rows) and diagnostics.
+// Detect itself reads overlay tiles directly and does not use the map (lib/overlay-tiles.ts).
 //
 // Mechanism: project the point's lon/lat to a screen pixel, query a small box around it with
 // map.queryRenderedFeatures(box), then keep features that belong to one of the user's overlays.
@@ -9,8 +10,6 @@
 //
 // Only vector/geojson overlays that are toggled ON carry attributes; raster (MapServer image)
 // overlays return nothing here.
-
-import type { OverlayFieldMapping } from './overlay-field-map.ts';
 
 type PixelBox = [[number, number], [number, number]];
 
@@ -143,28 +142,8 @@ export function debugAtPoint(
     };
 }
 
-/** Apply the static mapping at the point: read each mapped attribute from its overlay layer. */
-export function detectValues(
-    map: MapLike,
-    lonLat: [number, number],
-    mapping: OverlayFieldMapping[],
-): DetectResult[] {
-    if (!mapping.length) return [];
-    const feats = map.queryRenderedFeatures(boxAround(map, lonLat));
-
-    return mapping.map((m) => {
-        // First matching feature wins (one area feature per overlay at a point).
-        const feat = feats.find((f) => layerMatches(f.layer.id, m.overlayLayerId));
-        const props = feat ? (feat.properties ?? {}) as Record<string, unknown> : undefined;
-        const raw = props ? props[m.attribute] : undefined;
-        const rawStr = raw == null || raw === '' ? null : String(raw);
-        const value = rawStr == null ? null : translateValue(rawStr, m.valueMap);
-        return { customFieldId: m.customFieldId, overlayLayerId: m.overlayLayerId, attribute: m.attribute, value };
-    });
-}
-
 /** Translate an overlay value to its D4H equivalent via the row's valueMap (normalized key match). */
-function translateValue(raw: string, valueMap?: Record<string, string>): string {
+export function translateValue(raw: string, valueMap?: Record<string, string>): string {
     if (!valueMap) return raw;
     const norm = normalizeLabel(raw);
     for (const [k, v] of Object.entries(valueMap)) {

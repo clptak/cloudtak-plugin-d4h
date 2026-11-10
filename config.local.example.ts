@@ -26,6 +26,12 @@ export const deploymentDefaults: DeploymentSettings = {
  * Find values with Submit Incident → "Inspect overlays at point": use the
  * stable layer id shown in green (without the leading runtime number) and the
  * custom field id shown next to each field. Placeholder values below.
+ *
+ * Detect finds each overlay in CloudTAK's catalog from its layer id and reads its
+ * tiles, so nobody has to add or turn on an overlay; the person's account only has
+ * to be able to see it in the catalog. If an overlay uses CloudTAK's default style
+ * (layer ids like "<number>-poly"), the catalog has no layer ids for it, so add
+ * `basemapId: <catalog id>` to its rows.
  */
 export const overlayFieldMap: OverlayFieldMapping[] = [
     // {

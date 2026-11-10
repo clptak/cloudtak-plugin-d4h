@@ -23,9 +23,9 @@
 //      whitespace-normalized) against the field's option labels; the matching option id is selected.
 //      TEXT / TEXT_AREA / NUMBER / DATE / DATETIME / TIME fields: the (translated) value is written as-is.
 //
-// Note: the overlay must be added to the user's map (Overlays menu). If it is switched off, detect
-// shows its mapped layers on the map while reading and hides them again (lib/overlay-ensure.ts);
-// nothing is saved to the server. Detect recenters the map on the point first so the tiles render.
+// Detect does not need the overlay on the map: it finds the overlay in CloudTAK's catalog from the
+// layer id and reads its vector tiles directly (lib/overlay-tiles.ts), so nobody has to add or turn
+// on anything. Inspect does need the overlay on, once, while you author rows.
 
 import { deploymentOverlayFieldMap } from './deploymentDefaults.ts';
 
@@ -38,6 +38,12 @@ export interface OverlayFieldMapping {
      * so a full runtime id like "1202-136-poly" only works until the next restart.
      */
     overlayLayerId: string;
+    /**
+     * Catalog id of the overlay (the {id} in /api/basemap/{id}). Only needed when the overlay uses
+     * CloudTAK's default style, because its layer ids then contain a per-person number that no
+     * catalog entry records. Leave it out when the overlay has its own style.
+     */
+    basemapId?: number;
     /** Property key on that overlay's features whose value to use, e.g. "DISTRICT_NAME". */
     attribute: string;
     /**
