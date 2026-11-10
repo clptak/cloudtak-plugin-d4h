@@ -1,4 +1,5 @@
 import type { DeploymentSettings } from './lib/deploymentDefaults.ts';
+import type { OverlayFieldMapping } from './lib/overlay-field-map.ts';
 
 /**
  * Copy to config.local.ts (gitignored), fill in this deployment, then restart
@@ -16,3 +17,28 @@ export const deploymentDefaults: DeploymentSettings = {
     context: 'team',
     contextId: 0,
 };
+
+/**
+ * Optional: Submit Incident overlay auto-fill. Each row reads `attribute` from
+ * overlay layer `overlayLayerId` at the incident point and writes it into D4H
+ * incident custom field `customFieldId`. Leave empty to hide the Detect button.
+ *
+ * Find values with Submit Incident → "Inspect overlays at point": use the
+ * stable layer id shown in green (without the leading runtime number) and the
+ * custom field id shown next to each field. Placeholder values below.
+ */
+export const overlayFieldMap: OverlayFieldMapping[] = [
+    // {
+    //     customFieldId: 1001,
+    //     overlayLayerId: '57-fill',
+    //     attribute: 'DISTRICT_NAME',
+    //     note: 'Supervisor district (SINGLE_CHOICE)',
+    //     valueMap: { 'District A': 'AGENCY DISTRICT A' },
+    // },
+    // {
+    //     customFieldId: 1002,
+    //     overlayLayerId: 'wilderness-poly',
+    //     attribute: 'NAME',
+    //     note: 'Wilderness area name (TEXT)',
+    // },
+];
