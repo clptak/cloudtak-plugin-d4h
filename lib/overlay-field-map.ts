@@ -23,8 +23,9 @@
 //      whitespace-normalized) against the field's option labels; the matching option id is selected.
 //      TEXT / TEXT_AREA / NUMBER / DATE / DATETIME / TIME fields: the (translated) value is written as-is.
 //
-// Note: auto-detect can only read overlays that are toggled ON. The "Detect" button recenters the
-// map on the point first so the overlay tiles are rendered there before querying.
+// Note: the overlay must be added to the user's map (Overlays menu). If it is switched off, detect
+// shows its mapped layers on the map while reading and hides them again (lib/overlay-ensure.ts);
+// nothing is saved to the server. Detect recenters the map on the point first so the tiles render.
 
 import { deploymentOverlayFieldMap } from './deploymentDefaults.ts';
 
