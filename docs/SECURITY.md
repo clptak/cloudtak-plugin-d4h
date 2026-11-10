@@ -61,7 +61,7 @@ Before making the repository public:
    rg -i '(password|api[_-]?key|secret|bearer [a-zA-Z0-9]{20,}|ghp_|sk-|AKIA)' .
    ```
 3. Search for org-specific identifiers you do not want public (team IDs, production hostnames, real names in comments).
-4. Review `lib/overlay-field-map.ts` — should contain only template/example rows, not live deployment mappings.
+4. Live overlay mappings belong in the gitignored `config.local.ts` (`overlayFieldMap`). Review `config.local.example.ts` — placeholder rows only.
 5. Run `npm run check` (or `scripts/check-like-docker.sh`) to ensure sanitization did not break the build.
 
 ## Reporting vulnerabilities

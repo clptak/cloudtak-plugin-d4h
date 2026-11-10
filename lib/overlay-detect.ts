@@ -1,4 +1,5 @@
-// Query ArcGIS/GeoJSON overlay attributes at a point, for the Submit Incident tab.
+// Map-based overlay helpers for the Submit Incident tab: Inspect (author rows) and diagnostics.
+// Detect itself reads overlay tiles directly and does not use the map (lib/overlay-tiles.ts).
 //
 // Mechanism: project the point's lon/lat to a screen pixel, query a small box around it with
 // map.queryRenderedFeatures(box), then keep features that belong to one of the user's overlays.
@@ -9,8 +10,6 @@
 //
 // Only vector/geojson overlays that are toggled ON carry attributes; raster (MapServer image)
 // overlays return nothing here.
-
-import type { OverlayFieldMapping } from './overlay-field-map.ts';
 
 type PixelBox = [[number, number], [number, number]];
 
@@ -56,6 +55,16 @@ export function layerSuffix(id: string): string {
     return id.replace(/^\d+-/, '');
 }
 
+/**
+ * Does a runtime layer id match a configured `overlayLayerId`?
+ * Only the runtime side has its volatile `${overlay.id}-` prefix stripped; the configured id is
+ * compared as written. Stripping both sides made a row's "38-polyline1" (→ "polyline1") miss the
+ * runtime "1202-38-polyline1" (→ "38-polyline1").
+ */
+export function layerMatches(runtimeLayerId: string, configLayerId: string): boolean {
+    return runtimeLayerId === configLayerId || layerSuffix(runtimeLayerId) === configLayerId;
+}
+
 export interface DetectResult {
     customFieldId:  number;
     overlayLayerId: string;
@@ -85,8 +94,7 @@ function visibleOverlays(overlays: OverlayLike[]): OverlayLike[] {
 
 /**
  * Dump every rendered OVERLAY feature under the point — used to author the mapping.
- * Does NOT depend on the map store's overlays list (which can come back empty inside a plugin);
- * it simply keeps any rendered layer whose id has the `${overlayId}-…` shape.
+ * Keeps any rendered layer whose id has the `${overlayId}-…` shape.
  */
 export function inspectAtPoint(
     map: MapLike,
@@ -134,35 +142,8 @@ export function debugAtPoint(
     };
 }
 
-/** Apply the static mapping at the point: read each mapped attribute from its overlay layer. */
-export function detectValues(
-    map: MapLike,
-    lonLat: [number, number],
-    mapping: OverlayFieldMapping[],
-): DetectResult[] {
-    if (!mapping.length) return [];
-    const feats = map.queryRenderedFeatures(boxAround(map, lonLat));
-
-    // Key by the STABLE layer suffix so matches survive restarts (the leading overlay-id changes).
-    // First feature per suffix wins (one area feature per overlay at a point).
-    const bySuffix = new Map<string, Record<string, unknown>>();
-    for (const f of feats) {
-        const suf = layerSuffix(f.layer.id);
-        if (!bySuffix.has(suf)) bySuffix.set(suf, (f.properties ?? {}) as Record<string, unknown>);
-    }
-
-    return mapping.map((m) => {
-        // Accept either a full id ("1202-136-poly") or just the stable part ("136-poly") in the map file.
-        const props = bySuffix.get(layerSuffix(m.overlayLayerId));
-        const raw = props ? props[m.attribute] : undefined;
-        const rawStr = raw == null || raw === '' ? null : String(raw);
-        const value = rawStr == null ? null : translateValue(rawStr, m.valueMap);
-        return { customFieldId: m.customFieldId, overlayLayerId: m.overlayLayerId, attribute: m.attribute, value };
-    });
-}
-
 /** Translate an overlay value to its D4H equivalent via the row's valueMap (normalized key match). */
-function translateValue(raw: string, valueMap?: Record<string, string>): string {
+export function translateValue(raw: string, valueMap?: Record<string, string>): string {
     if (!valueMap) return raw;
     const norm = normalizeLabel(raw);
     for (const [k, v] of Object.entries(valueMap)) {
