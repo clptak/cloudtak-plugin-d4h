@@ -1,6 +1,3 @@
-// @ts-nocheck — API route module; typechecked in CloudTAK api, not api/web vue-tsc
-/* eslint-disable @typescript-eslint/ban-ts-comment */
-/* eslint-disable */
 // Server-side D4H fetch + normalize + Postgres persist.
 //
 // Copied into CloudTAK api/stateless/routes/ alongside plugin-d4h.ts.
@@ -149,7 +146,12 @@ async function query<T>(config: PgConfig, statement: ReturnType<typeof sql>): Pr
 function asArray(v: unknown): unknown[] {
     let x: unknown = v;
     for (let i = 0; i < 4 && typeof x === 'string'; i++) {
-        try { x = JSON.parse(x); } catch { return []; }
+        try {
+            x = JSON.parse(x) as unknown;
+        } catch {
+            // Not JSON; stop unwrapping.
+            return [];
+        }
     }
     return Array.isArray(x) ? x : [];
 }
@@ -547,6 +549,7 @@ async function fetchContextName(cfg: ServerD4HConfig): Promise<string | null> {
         const body = await res.json() as RawRecord;
         return str(body.title) ?? str(body.name) ?? null;
     } catch {
+        // Display name is optional; sync continues without it.
         return null;
     }
 }
@@ -928,7 +931,9 @@ export async function runD4HSync(config: PgConfig, cfg: ServerD4HConfig): Promis
                 last_sync_status = 'error',
                 last_sync_error = ${msg.slice(0, 1000)}
             WHERE id = 1
-        `).catch(() => undefined);
+        `).catch((statusErr: unknown) => {
+            console.error('[d4h] failed to record sync error', statusErr);
+        });
         return { ok: false, error: `Persist failed: ${msg}`, roster, warnings, stats };
     }
 
