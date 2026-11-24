@@ -1,6 +1,6 @@
 // CloudTAK API calls behind lib/overlay-tiles.ts (copied from cloudtak-plugin-skydio).
 
-import { getRuntimeToken, server, stdurl } from '../../../src/std.ts';
+import { getRuntimeToken, server, std } from '../../../src/std.ts';
 import type { CatalogOverlay, OverlayTileApi, StyleLayer, TileInfo } from './overlay-tiles.ts';
 
 const PAGE_SIZE = 100; // The API's maximum.
@@ -9,6 +9,21 @@ const TILE_TIMEOUT_MS = 20000;
 function failure(error: unknown, fallback: string): Error {
     const message = (error as { message?: unknown } | undefined)?.message;
     return new Error(typeof message === 'string' && message ? message : fallback);
+}
+
+let tileBase: Promise<string> | undefined;
+
+/** CloudTAK v14 serves basemap tiles from the PMTiles tile server, not /api/basemap/:id/tiles. */
+function tileServerBase(): Promise<string> {
+    tileBase ??= (async () => {
+        const { data, error } = await server.GET('/api/config/tiles');
+        if (error || !data?.url) throw failure(error, 'Could not read the tile server URL');
+        return data.url.replace(/\/$/, '');
+    })().catch((err) => {
+        tileBase = undefined;
+        throw err;
+    });
+    return tileBase;
 }
 
 function toCatalogOverlay(item: { id: number; styles?: unknown[] }): CatalogOverlay {
@@ -67,17 +82,19 @@ export const overlayTileApi: OverlayTileApi = {
     },
 
     async tileInfo(id) {
-        const { data, error } = await server.GET('/api/basemap/{:basemapid}/tiles', {
-            params: { path: { ':basemapid': id }, query: {} },
-        });
-        if (error || !data) throw failure(error, `Could not read tile details for overlay ${id}`);
-        return data as TileInfo;
+        try {
+            const base = await tileServerBase();
+            return await std(`${base}/tiles/basemap/${id}/tiles`) as TileInfo;
+        } catch (err) {
+            throw failure(err, `Could not read tile details for overlay ${id}`);
+        }
     },
 
     // Plain fetch: CloudTAK's client reports every 404 as an app error, and a 404 here is normal.
     async fetchTile(id, z, x, y) {
         const token = await getRuntimeToken();
-        const res = await fetch(stdurl(`/api/basemap/${id}/tiles/${z}/${x}/${y}`), {
+        const base = await tileServerBase();
+        const res = await fetch(`${base}/tiles/basemap/${id}/tiles/${z}/${x}/${y}`, {
             headers: token ? { Authorization: `Bearer ${token}` } : {},
             signal: AbortSignal.timeout(TILE_TIMEOUT_MS),
         });
