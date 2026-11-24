@@ -1,9 +1,8 @@
-// @ts-nocheck — API route module; typechecked in CloudTAK api, not api/web vue-tsc
-/* eslint-disable @typescript-eslint/ban-ts-comment */
-/* eslint-disable */
 // CloudTAK server route for hybrid D4H persistence.
 //
 // Install: copy server/*.ts → api/stateless/routes/ and rebuild the API image.
+// Requires CloudTAK 13.124+ (API OXLint). Callers use the Authorization header
+// via std(); these routes do not accept ?token=.
 // Provides Postgres-backed roster + group-filtered GET endpoints + admin sync.
 // Periodic sync runs in-process from d4h_config.sync_interval_minutes (single-replica).
 
@@ -148,17 +147,18 @@ interface CallerAccess {
     groups: string[];
 }
 
-async function resolveCallerAccess(config: ConfigStateless, req: unknown): Promise<CallerAccess> {
-    const user = await Auth.as_user(config, req as never);
+async function resolveCallerAccess(
+    config: ConfigStateless,
+    req: Parameters<typeof Auth.as_user>[1],
+): Promise<CallerAccess> {
+    const user = await Auth.as_user(config, req);
     const profile = await config.models.Profile.from(user.email);
-    const isAdmin = !!(profile as { system_admin?: boolean; agency_admin?: unknown }).system_admin
-        || (Array.isArray((profile as { agency_admin?: unknown }).agency_admin)
-            && ((profile as { agency_admin: unknown[] }).agency_admin).length > 0);
+    const isAdmin = profile.system_admin || profile.agency_admin.length > 0;
 
     if (isAdmin) return { isAdmin: true, groups: [] };
 
-    const auth = (profile as { auth?: { cert?: string; key?: string } }).auth;
-    if (!auth?.cert || !auth?.key) {
+    const auth = profile.auth;
+    if (!auth?.cert || !auth.key) {
         return { isAdmin: false, groups: [] };
     }
 
@@ -168,8 +168,8 @@ async function resolveCallerAccess(config: ConfigStateless, req: unknown): Promi
             new APIAuthCertificate(auth.cert, auth.key),
         );
         const groups = (await api.Group.list({ useCache: true })).data
-            .filter((g: { active?: boolean }) => g.active)
-            .map((g: { name: string }) => g.name);
+            .filter((g) => g.active)
+            .map((g) => g.name);
         return { isAdmin: false, groups };
     } catch (err) {
         console.error('[d4h] group resolution failed', err);
@@ -186,84 +186,165 @@ function visibleByGroups<T extends { groups?: string[] }>(
     return rows.filter((r) => (r.groups ?? []).some((g) => access.groups.includes(g)));
 }
 
-function mapMember(row: Record<string, unknown>): D4HMember {
+type DbText = string | number | boolean | Date | null;
+
+function dbText(value: DbText): string | undefined {
+    if (value == null) return undefined;
+    if (value instanceof Date) return value.toISOString();
+    return String(value);
+}
+
+interface MemberRow {
+    id: number | string;
+    ref: DbText;
+    name: DbText;
+    callsign: DbText;
+    position: DbText;
+    status: DbText;
+    email: DbText;
+    mobile: DbText;
+    phone: DbText;
+    qualifications: unknown;
+    groups: unknown;
+}
+
+interface EquipmentRow {
+    id: number | string;
+    ref: DbText;
+    name: DbText;
+    make: DbText;
+    model: DbText;
+    brand_id: number | string | null;
+    model_id: number | string | null;
+    category_id: number | string | null;
+    category: DbText;
+    status: DbText;
+    groups: unknown;
+}
+
+interface ResourceRow {
+    id: number | string;
+    name: DbText;
+    groups: unknown;
+}
+
+interface IncidentRow {
+    id: number | string;
+    reference: DbText;
+    title: DbText;
+    starts_at: DbText;
+    ends_at: DbText;
+    tracking_number: DbText;
+    description: DbText;
+    published: boolean | null;
+    mission_guid: DbText;
+    groups: unknown;
+}
+
+function mapMember(row: MemberRow): D4HMember {
     return {
         id: Number(row.id),
-        ref: row.ref != null ? String(row.ref) : undefined,
-        name: String(row.name),
-        callsign: row.callsign != null ? String(row.callsign) : undefined,
-        position: row.position != null ? String(row.position) : undefined,
-        status: row.status != null ? String(row.status) : undefined,
-        email: row.email != null ? String(row.email) : undefined,
-        mobile: row.mobile != null ? String(row.mobile) : undefined,
-        phone: row.phone != null ? String(row.phone) : undefined,
-        qualifications: asArray(row.qualifications) as D4HMember['qualifications'],
+        ref: dbText(row.ref),
+        name: dbText(row.name) ?? '',
+        callsign: dbText(row.callsign),
+        position: dbText(row.position),
+        status: dbText(row.status),
+        email: dbText(row.email),
+        mobile: dbText(row.mobile),
+        phone: dbText(row.phone),
+        qualifications: asQualifications(row.qualifications),
         groups: asStringArray(row.groups),
     };
 }
 
-function mapEquipment(row: Record<string, unknown>): D4HEquipment {
+function asQualifications(value: unknown): D4HMember['qualifications'] {
+    const out: NonNullable<D4HMember['qualifications']> = [];
+    for (const item of asArray(value)) {
+        if (!item || typeof item !== 'object') continue;
+        const q = item as Record<string, unknown>;
+        const id = typeof q.id === 'number' ? q.id : (typeof q.id === 'string' ? Number(q.id) : Number.NaN);
+        const name = typeof q.name === 'string' ? q.name : '';
+        if (!Number.isFinite(id) || !name) continue;
+        const expiresAt = typeof q.expiresAt === 'string' ? q.expiresAt : undefined;
+        const memberId = typeof q.memberId === 'number' ? q.memberId : undefined;
+        out.push({ id, name, expiresAt, memberId });
+    }
+    return out;
+}
+
+function mapEquipment(row: EquipmentRow): D4HEquipment {
     return {
         id: Number(row.id),
-        ref: row.ref != null ? String(row.ref) : undefined,
-        name: String(row.name),
-        make: row.make != null ? String(row.make) : undefined,
-        model: row.model != null ? String(row.model) : undefined,
+        ref: dbText(row.ref),
+        name: dbText(row.name) ?? '',
+        make: dbText(row.make),
+        model: dbText(row.model),
         brandId: row.brand_id != null ? Number(row.brand_id) : undefined,
         modelId: row.model_id != null ? Number(row.model_id) : undefined,
         categoryId: row.category_id != null ? Number(row.category_id) : undefined,
-        category: row.category != null ? String(row.category) : undefined,
-        status: row.status != null ? String(row.status) : undefined,
+        category: dbText(row.category),
+        status: dbText(row.status),
         groups: asStringArray(row.groups),
     };
 }
 
-function mapResource(row: Record<string, unknown>): D4HExternalResource {
+function mapResource(row: ResourceRow): D4HExternalResource {
     return {
         id: Number(row.id),
-        name: String(row.name),
+        name: dbText(row.name) ?? '',
         groups: asStringArray(row.groups),
     };
 }
 
-function mapIncident(row: Record<string, unknown>): D4HIncident {
+function mapIncident(row: IncidentRow): D4HIncident {
     return {
         id: Number(row.id),
-        reference: row.reference != null ? String(row.reference) : undefined,
-        title: String(row.title),
-        startsAt: row.starts_at != null ? String(row.starts_at) : undefined,
-        endsAt: row.ends_at != null ? String(row.ends_at) : undefined,
-        trackingNumber: row.tracking_number != null ? String(row.tracking_number) : undefined,
-        description: row.description != null ? String(row.description) : undefined,
+        reference: dbText(row.reference),
+        title: dbText(row.title) ?? '',
+        startsAt: dbText(row.starts_at),
+        endsAt: dbText(row.ends_at),
+        trackingNumber: dbText(row.tracking_number),
+        description: dbText(row.description),
         published: typeof row.published === 'boolean' ? row.published : undefined,
-        missionGuid: row.mission_guid != null ? String(row.mission_guid) : undefined,
+        missionGuid: dbText(row.mission_guid),
         groups: asStringArray(row.groups),
     };
+}
+
+function parseJson(value: string): unknown {
+    return JSON.parse(value) as unknown;
 }
 
 async function loadMeta(config: ConfigStateless): Promise<D4HRosterMeta | null> {
     const rows = await query<{ payload: unknown }>(config, sql`SELECT payload FROM d4h_meta WHERE id = 1`);
-    if (!rows[0]?.payload) return null;
-    let payload = rows[0].payload;
+    const stored = rows[0]?.payload;
+    if (stored == null) return null;
+    let payload: unknown = stored;
     if (typeof payload === 'string') {
-        try { payload = JSON.parse(payload); } catch { return null; }
+        try {
+            payload = parseJson(payload);
+        } catch {
+            // Stored payload is not JSON; treat meta as missing.
+            return null;
+        }
     }
+    if (!payload || typeof payload !== 'object') return null;
     return payload as D4HRosterMeta;
 }
 
 async function loadFilteredRoster(config: ConfigStateless, access: CallerAccess): Promise<D4HRoster> {
-    const memberRows = await query<Record<string, unknown>>(config, sql`
+    const memberRows = await query<MemberRow>(config, sql`
         SELECT id, ref, name, callsign, position, status, email, mobile, phone, qualifications, groups
         FROM d4h_members ORDER BY name ASC
     `);
-    const equipmentRows = await query<Record<string, unknown>>(config, sql`
+    const equipmentRows = await query<EquipmentRow>(config, sql`
         SELECT id, ref, name, make, model, brand_id, model_id, category_id, category, status, groups
         FROM d4h_equipment ORDER BY name ASC
     `);
-    const resourceRows = await query<Record<string, unknown>>(config, sql`
+    const resourceRows = await query<ResourceRow>(config, sql`
         SELECT id, name, groups FROM d4h_external_resources ORDER BY name ASC
     `);
-    const incidentRows = await query<Record<string, unknown>>(config, sql`
+    const incidentRows = await query<IncidentRow>(config, sql`
         SELECT id, reference, title, starts_at, ends_at, tracking_number, description,
                published, mission_guid, groups
         FROM d4h_incidents ORDER BY starts_at DESC NULLS LAST
@@ -371,11 +452,11 @@ export default async function router(schema: Schema, config: ConfigStateless): P
         name: 'Get D4H server config',
         group: 'D4H',
         description: 'Redacted server-side D4H config (no token value)',
+        security: Auth.security({}),
         res: Type.Any(),
     }, async (req, res) => {
         try {
             await Auth.is_auth(config, req);
-            const cfg = await loadServerConfig(config);
             // Even with empty token, return the row fields for the form.
             const rows = await query<{
                 region: string;
@@ -417,7 +498,6 @@ export default async function router(schema: Schema, config: ConfigStateless): P
                 tokenConfigured: !!row.token,
                 available: true,
             });
-            void cfg;
         } catch (err) {
             Err.respond(err, res);
         }
@@ -437,6 +517,7 @@ export default async function router(schema: Schema, config: ConfigStateless): P
             syncIntervalMinutes: Type.Optional(Type.Integer()),
             clearToken: Type.Optional(Type.Boolean()),
         }),
+        security: Auth.security({ admin: true }),
         res: Type.Any(),
     }, async (req, res) => {
         try {
@@ -510,6 +591,7 @@ export default async function router(schema: Schema, config: ConfigStateless): P
         name: 'Sync D4H roster',
         group: 'D4H',
         description: 'Admin-only: pull from D4H into Postgres (also usable by external cron)',
+        security: Auth.security({ admin: true }),
         res: Type.Any(),
     }, async (req, res) => {
         try {
@@ -530,6 +612,7 @@ export default async function router(schema: Schema, config: ConfigStateless): P
         name: 'Get D4H roster',
         group: 'D4H',
         description: 'Group-filtered full roster for the plugin UI',
+        security: Auth.security({}),
         res: Type.Any(),
     }, async (req, res) => {
         try {
@@ -549,11 +632,12 @@ export default async function router(schema: Schema, config: ConfigStateless): P
             ref: Type.Optional(Type.String()),
             callsign: Type.Optional(Type.String()),
         }),
+        security: Auth.security({}),
         res: Type.Any(),
     }, async (req, res) => {
         try {
             const access = await resolveCallerAccess(config, req);
-            const rows = await query<Record<string, unknown>>(config, sql`
+            const rows = await query<MemberRow>(config, sql`
                 SELECT id, ref, name, callsign, position, status, email, mobile, phone, qualifications, groups
                 FROM d4h_members ORDER BY name ASC
             `);
@@ -579,11 +663,12 @@ export default async function router(schema: Schema, config: ConfigStateless): P
         name: 'List D4H equipment',
         group: 'D4H',
         description: 'Group-filtered equipment',
+        security: Auth.security({}),
         res: Type.Any(),
     }, async (req, res) => {
         try {
             const access = await resolveCallerAccess(config, req);
-            const rows = await query<Record<string, unknown>>(config, sql`
+            const rows = await query<EquipmentRow>(config, sql`
                 SELECT id, ref, name, make, model, brand_id, model_id, category_id, category, status, groups
                 FROM d4h_equipment ORDER BY name ASC
             `);
@@ -597,6 +682,7 @@ export default async function router(schema: Schema, config: ConfigStateless): P
         name: 'Get D4H sync meta',
         group: 'D4H',
         description: 'Last sync header / warnings',
+        security: Auth.security({}),
         res: Type.Any(),
     }, async (req, res) => {
         try {

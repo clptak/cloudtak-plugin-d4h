@@ -10,6 +10,20 @@
 Copies `server/plugin-d4h.ts` + `server/d4h-sync.ts` into `api/stateless/routes/` and
 symlinks the web plugin under `api/web/plugins/d4h`.
 
+Requires **CloudTAK 13.124+**. Those route files are compiled and OXLinted with the API
+image (`npm run lint && npm run build`). They declare `security: Auth.security(...)` for
+header JWTs. They do not accept `?token=`.
+
+A CloudTAK update does not delete extra files in `api/stateless/routes/`. After pulling
+this plugin, run `./scripts/install.sh` again so the copies match, then rebuild the API
+image. Confirm the running tree has the new routes:
+
+```bash
+grep -n "Auth.security" "$CLOUDTAK/api/stateless/routes/plugin-d4h.ts"
+# expect several Auth.security lines, and no @ts-nocheck
+grep -n "@ts-nocheck\|eslint-disable" "$CLOUDTAK/api/stateless/routes/plugin-d4h.ts" "$CLOUDTAK/api/stateless/routes/d4h-sync.ts" || true
+```
+
 ## Configuration
 
 ### Server sync (system admin)

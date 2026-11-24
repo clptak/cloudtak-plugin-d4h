@@ -17,7 +17,8 @@
 ```
 
 Copies `server/plugin-d4h.ts` + `server/d4h-sync.ts` into `api/stateless/routes/` and
-symlinks the web plugin under `api/web/plugins/d4h`.
+symlinks the web plugin under `api/web/plugins/d4h`. Requires CloudTAK 13.124 or newer,
+because those routes are OXLinted as part of the API image. See [docs/installation.md](docs/installation.md).
 
 ## Configuration
 
